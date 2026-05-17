@@ -1,0 +1,9 @@
+{
+    "version":  "1.0.1",
+    "publishedAt":  "2026-05-16T04:38:27.4870942+09:00",
+    "channel":  "client",
+    "sha256":  "968f4e4524b1994f154c81afecaab0a15c6548c33053c75068d3eb1caf7874ec",
+    "notes":  "smoke test",
+    "fileName":  "kakimoni-client-1.0.1.exe",
+    "size":  176265728
+}

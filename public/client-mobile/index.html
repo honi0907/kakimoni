@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>KakiMoni - 子機（スマホ）</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #111; color: #eee; font-family: 'Montserrat', sans-serif;
+    width: 100dvw; height: 100dvh; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+
+  /* ── 設定モーダル ─────────────────────── */
+  #setup-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+    display: flex; align-items: flex-start; justify-content: center;
+    z-index: 1000; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: 20px 0 40px; touch-action: pan-y;
+  }
+  #setup-modal, #setup-modal * { touch-action: pan-y; }
+  .setup-box {
+    background: #1e1e2e; border: 2px solid #4a4a8a; border-radius: 16px;
+    padding: 24px 20px; width: 92%; max-width: 420px; text-align: center;
+    flex-shrink: 0;
+  }
+  .setup-box h2 { color: #a78bfa; margin-bottom: 20px; font-size: 1.4rem; }
+  .setup-box label {
+    display: block; text-align: left; margin-bottom: 5px;
+    color: #aaa; font-size: 0.9rem;
+  }
+  .setup-box input, .setup-box select {
+    width: 100%; padding: 12px 14px; border-radius: 10px;
+    background: #2d2d4a; border: 2px solid #4a4a8a; color: #eee;
+    font-size: 1rem; margin-bottom: 16px; outline: none;
+    -webkit-appearance: none;
+  }
+  .setup-box input:focus, .setup-box select:focus { border-color: #a78bfa; }
+  .setup-box button {
+    width: 100%; padding: 14px; border: none; border-radius: 12px;
+    color: #fff; font-size: 1.1rem; font-weight: bold; cursor: pointer;
+    margin-bottom: 10px;
+  }
+  #btn-setup-start { background: linear-gradient(180deg,#16a34a 0%,#15803d 100%); }
+  #btn-setup-start:active { filter: brightness(0.85); }
+  #duplicate-error {
+    display: none; background: #450a0a; border: 1px solid #dc2626;
+    border-radius: 8px; padding: 10px 14px; margin-bottom: 14px;
+    color: #fca5a5; font-size: 0.9rem; text-align: left;
+  }
+
+  /* ── メイン ─────────────────────────── */
+  #main { display: none; flex-direction: column; width: 100dvw; height: 100dvh; }
+
+  /* ツールバー */
+  #toolbar {
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 10px; gap: 8px;
+    background: #1a1a2e; border-bottom: 2px solid #2d2d4a;
+    height: 56px;
+  }
+  #seat-label {
+    font-size: 1rem; color: #a78bfa; font-weight: bold; white-space: nowrap;
+    min-width: 50px;
+  }
+  #conn-dot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; flex-shrink: 0; }
+  #conn-dot.connected { background: #4ade80; }
+
+  .tool-btn {
+    height: 42px; padding: 0 16px; border-radius: 8px; border: none;
+    font-size: 1rem; font-weight: bold; color: #fff; cursor: pointer;
+    flex-shrink: 0;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.4);
+    transition: transform 0.1s, box-shadow 0.1s;
+    touch-action: manipulation;
+  }
+  .tool-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,0.4); }
+  #btn-clear   { background: linear-gradient(180deg,#16a34a 0%,#15803d 100%); }
+  #btn-confirm { background: linear-gradient(180deg,#dc2626 0%,#b91c1c 100%); }
+  #btn-confirm:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  /* キャンバス外枠（レターボックス） */
+  #canvas-outer {
+    flex: 1; min-height: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #111;
+  }
+
+  /* キャンバスエリア（16:9固定） */
+  #canvas-wrap {
+    position: relative; overflow: hidden;
+    background: #fff; touch-action: none;
+    aspect-ratio: 16 / 9;
+    width: 100%; max-height: 100%;
+  }
+  #main-canvas { position: absolute; top: 0; left: 0; touch-action: none; }
+
+  /* ロックオーバーレイ */
+  #lock-overlay {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.6);
+    display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 12px; z-index: 20;
+  }
+  #lock-overlay.active { display: flex; }
+  #lock-overlay .lock-icon { font-size: 4rem; }
+  #lock-overlay .lock-msg  { font-size: 1.6rem; color: #f87171; font-weight: bold; }
+
+  /* 判定オーバーレイ */
+  #judge-overlay {
+    position: absolute; inset: 0; z-index: 15;
+    pointer-events: none; display: none;
+    align-items: center; justify-content: center;
+  }
+  #judge-overlay.show { display: flex; }
+  #judge-overlay img {
+    max-width: 70%; max-height: 70%; object-fit: contain;
+    animation: popIn 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards;
+  }
+  @keyframes popIn {
+    from { transform: scale(0.5); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+
+  /* クリア確認ダイアログ */
+  #clear-confirm {
+    display: none; position: absolute; top: 12px; left: 50%;
+    transform: translateX(-50%); z-index: 50;
+    align-items: center; gap: 10px;
+    background: rgba(15,23,42,0.97); border: 2px solid #dc2626;
+    border-radius: 12px; padding: 10px 18px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.6); touch-action: manipulation;
+  }
+  #clear-confirm.show { display: flex; }
+  #clear-confirm span { color: #fbbf24; font-size: 1rem; font-weight: bold; white-space: nowrap; }
+  #btn-clear-ok  { background: #dc2626; color: #fff; padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 1rem; font-weight: bold; touch-action: manipulation; }
+  #btn-clear-no  { background: #475569; color: #fff; padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 1rem; font-weight: bold; touch-action: manipulation; }
+
+  /* ── 横向き: ツールバーをコンパクト化してキャンバスを最大化 ── */
+  @media (orientation: landscape) {
+    #toolbar {
+      height: 44px;
+      padding: 4px 8px;
+    }
+    .tool-btn {
+      height: 34px;
+      padding: 0 12px;
+      font-size: 0.9rem;
+    }
+    #seat-label { font-size: 0.9rem; }
+  }
+
+  /* ── ノッチ・セーフエリア対応（iPhone X等） ── */
+  #main {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+</style>
+</head>
+<body>
+
+<!-- 設定モーダル -->
+<div id="setup-modal">
+  <div class="setup-box">
+    <h2>✏️ KakiMoni 子機（スマホ）</h2>
+
+    <div id="duplicate-error">⚠️ このIDはすでに接続されています。別のIDを選んでください。</div>
+
+    <label for="input-server-url">サーバーURL</label>
+    <input type="text" id="input-server-url" placeholder="http://192.168.x.x:3000" inputmode="url">
+
+    <label for="input-seat">ID</label>
+    <select id="input-seat">
+      <option value="1">1番</option>
+      <option value="2">2番</option>
+      <option value="3">3番</option>
+      <option value="4">4番</option>
+      <option value="5">5番</option>
+      <option value="6">6番</option>
+      <option value="7">7番</option>
+      <option value="8">8番</option>
+      <option value="9">9番</option>
+      <option value="10">10番</option>
+    </select>
+
+    <button id="btn-setup-start">接続してスタート</button>
+  </div>
+</div>
+
+<!-- メイン -->
+<div id="main">
+  <!-- ツールバー -->
+  <div id="toolbar">
+    <span id="seat-label"></span>
+    <span id="conn-dot"></span>
+    <button class="tool-btn" id="btn-clear">クリア</button>
+    <button class="tool-btn" id="btn-confirm">決定</button>
+  </div>
+  <!-- キャンバス外枠（16:9レターボックス） -->
+  <div id="canvas-outer">
+  <div id="canvas-wrap">
+    <canvas id="main-canvas"></canvas>
+    <div id="lock-overlay">
+      <div class="lock-icon">🔒</div>
+      <div class="lock-msg">回答締切</div>
+    </div>
+    <div id="judge-overlay"><img id="judge-img" src="" alt=""></div>
+    <div id="clear-confirm">
+      <span>消去しますか？</span>
+      <button id="btn-clear-ok">はい</button>
+      <button id="btn-clear-no">いいえ</button>
+    </div>
+  </div><!-- /canvas-wrap -->
+  </div><!-- /canvas-outer -->
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// ======================================================
+// 変数
+// ======================================================
+const PEN_COLOR = '#000000';
+const PEN_SIZE  = 6;
+
+let socket       = null;
+let isDrawing    = false;
+let isLocked     = false;
+let isConfirmed  = false;
+let currentStroke = null;
+let strokeHistory = [];
+let undoStack    = [];
+let fillImageUrl = '';
+let lockDarkness = 65;
+
+const setupModal  = document.getElementById('setup-modal');
+const main        = document.getElementById('main');
+const canvas      = document.getElementById('main-canvas');
+const wrap        = document.getElementById('canvas-wrap');
+const ctx         = canvas.getContext('2d');
+const connDot     = document.getElementById('conn-dot');
+const lockOverlay = document.getElementById('lock-overlay');
+const btnConfirm  = document.getElementById('btn-confirm');
+const judgeOverlay = document.getElementById('judge-overlay');
+const judgeImg    = document.getElementById('judge-img');
+const clearConfirm = document.getElementById('clear-confirm');
+
+// ======================================================
+// 設定復元
+// ======================================================
+(function() {
+  const params = new URLSearchParams(location.search);
+  const urlParam = params.get('serverUrl');
+  if (urlParam) {
+    document.getElementById('input-server-url').value = urlParam;
+  } else {
+    const saved = localStorage.getItem('kakimoni_server_url');
+    if (saved) document.getElementById('input-server-url').value = saved;
+    else document.getElementById('input-server-url').value = location.origin;
+  }
+  const savedSeat = localStorage.getItem('kakimoni_mobile_seat');
+  if (savedSeat) document.getElementById('input-seat').value = savedSeat;
+})();
+
+document.getElementById('btn-setup-start').addEventListener('click', () => {
+  const serverUrl = document.getElementById('input-server-url').value.trim().replace(/\/$/, '');
+  const seatId    = document.getElementById('input-seat').value;
+  if (!serverUrl) { alert('サーバーURLを入力してください'); return; }
+  localStorage.setItem('kakimoni_server_url', serverUrl);
+  localStorage.setItem('kakimoni_mobile_seat', seatId);
+  setupModal.style.display = 'none';
+  main.style.display = 'flex';
+  initCanvas();
+  connectSocket(serverUrl, seatId);
+  document.getElementById('seat-label').textContent = seatId + '番';
+});
+
+// ======================================================
+// キャンバス初期化 / リサイズ
+// ======================================================
+function initCanvas() {
+  resizeCanvas();
+  // visualViewport: iOS Safari のアドレスバー出入りに対応
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => requestAnimationFrame(resizeCanvas));
+  } else {
+    window.addEventListener('resize', () => requestAnimationFrame(resizeCanvas));
+  }
+  // 回転検知（screen.orientation + fallback両方）
+  if (screen.orientation) {
+    screen.orientation.addEventListener('change', () => setTimeout(resizeCanvas, 300));
+  }
+  window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 300));
+}
+
+function resizeCanvas() {
+  const { width, height } = wrap.getBoundingClientRect();
+  const r = window.devicePixelRatio || 1;
+  canvas.width  = Math.floor(width  * r);
+  canvas.height = Math.floor(height * r);
+  canvas.style.width  = width  + 'px';
+  canvas.style.height = height + 'px';
+  ctx.scale(r, r);
+  redrawAll();
+}
+
+// ======================================================
+// 描画
+// ======================================================
+function getXY(e) {
+  const rect = canvas.getBoundingClientRect();
+  const src  = e.changedTouches ? e.changedTouches[0] : e;
+  return {
+    x: (src.clientX - rect.left),
+    y: (src.clientY - rect.top),
+  };
+}
+
+function redrawAll() {
+  const w = canvas.width  / (window.devicePixelRatio || 1);
+  const h = canvas.height / (window.devicePixelRatio || 1);
+  ctx.clearRect(0, 0, w, h);
+  if (fillImageUrl) {
+    const img = new Image();
+    img.onload = () => { ctx.drawImage(img, 0, 0, w, h); redrawStrokes(); };
+    img.src = fillImageUrl;
+  } else {
+    redrawStrokes();
+  }
+}
+
+function redrawStrokes() {
+  for (const s of strokeHistory) drawStroke(s);
+}
+
+function drawStroke(stroke) {
+  if (!stroke.points || stroke.points.length < 1) return;
+  const dw = canvas.width  / (window.devicePixelRatio || 1);
+  const dh = canvas.height / (window.devicePixelRatio || 1);
+  const sx = stroke.srcW > 0 ? dw / stroke.srcW : 1;
+  const sy = stroke.srcH > 0 ? dh / stroke.srcH : 1;
+  ctx.save();
+  ctx.scale(sx, sy);
+  if (stroke.tool === 'eraser') {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.strokeStyle = 'rgba(0,0,0,1)';
+  } else {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = stroke.color;
+  }
+  ctx.lineWidth = stroke.size;
+  ctx.lineCap   = 'round';
+  ctx.lineJoin  = 'round';
+  ctx.beginPath();
+  ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+  for (let i = 1; i < stroke.points.length; i++) {
+    const prev = stroke.points[i - 1];
+    const curr = stroke.points[i];
+    ctx.quadraticCurveTo(prev.x, prev.y, (prev.x + curr.x) / 2, (prev.y + curr.y) / 2);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ポインターイベント（タッチ + マウス共通）
+canvas.addEventListener('pointerdown', (e) => {
+  if (isLocked) return;
+  e.preventDefault();
+  isDrawing = true;
+  const pt = getXY(e);
+  const cw = canvas.width  / (window.devicePixelRatio || 1);
+  const ch = canvas.height / (window.devicePixelRatio || 1);
+  currentStroke = { tool: 'pen', color: PEN_COLOR, size: PEN_SIZE, points: [pt], srcW: cw, srcH: ch };
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.strokeStyle = PEN_COLOR;
+  ctx.lineWidth   = PEN_SIZE;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+  ctx.beginPath();
+  ctx.arc(pt.x, pt.y, PEN_SIZE / 2, 0, Math.PI * 2);
+  ctx.fillStyle = PEN_COLOR;
+  ctx.fill();
+  ctx.restore();
+  if (socket && socket.connected) socket.emit('stroke-start', currentStroke);
+}, { passive: false });
+
+canvas.addEventListener('pointermove', (e) => {
+  if (!isDrawing || !currentStroke) return;
+  e.preventDefault();
+  const pt  = getXY(e);
+  const pts = currentStroke.points;
+  pts.push(pt);
+  const prev = pts[pts.length - 2];
+  const curr = pts[pts.length - 1];
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.strokeStyle = PEN_COLOR;
+  ctx.lineWidth   = PEN_SIZE;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+  ctx.beginPath();
+  if (pts.length === 2) {
+    ctx.moveTo(prev.x, prev.y);
+    ctx.lineTo(curr.x, curr.y);
+  } else {
+    const pprev = pts[pts.length - 3];
+    ctx.moveTo((pprev.x + prev.x) / 2, (pprev.y + prev.y) / 2);
+    ctx.quadraticCurveTo(prev.x, prev.y, (prev.x + curr.x) / 2, (prev.y + curr.y) / 2);
+  }
+  ctx.stroke();
+  ctx.restore();
+  if (socket && socket.connected) socket.emit('stroke-point', { point: pt });
+}, { passive: false });
+
+canvas.addEventListener('pointerup', (e) => {
+  if (!isDrawing || !currentStroke) return;
+  isDrawing = false;
+  undoStack.push([...strokeHistory]);
+  strokeHistory.push(currentStroke);
+  if (socket && socket.connected) socket.emit('stroke-end');
+  currentStroke = null;
+}, { passive: false });
+
+canvas.addEventListener('pointercancel', () => {
+  if (!isDrawing || !currentStroke) return;
+  isDrawing = false;
+  undoStack.push([...strokeHistory]);
+  strokeHistory.push(currentStroke);
+  if (socket && socket.connected) socket.emit('stroke-end');
+  currentStroke = null;
+});
+
+// ======================================================
+// ボタン操作
+// ======================================================
+document.getElementById('btn-clear').addEventListener('click', () => {
+  clearConfirm.classList.add('show');
+});
+document.getElementById('btn-clear-ok').addEventListener('click', () => {
+  clearConfirm.classList.remove('show');
+  undoStack.push([...strokeHistory]);
+  strokeHistory.length = 0;
+  fillImageUrl = '';
+  redrawAll();
+  if (socket) socket.emit('clear-canvas');
+});
+document.getElementById('btn-clear-no').addEventListener('click', () => {
+  clearConfirm.classList.remove('show');
+});
+
+btnConfirm.addEventListener('click', () => {
+  if (isLocked) return;
+  isConfirmed = true;
+  btnConfirm.disabled = true;
+  document.getElementById('lock-icon').textContent = '✅';
+  document.getElementById('lock-msg').textContent  = '回答確定';  lockOverlay.style.background = `rgba(0,0,0,${lockDarkness / 100})`;  lockOverlay.classList.add('active');
+  if (socket && socket.connected) socket.emit('client-confirm');
+});
+
+// ======================================================
+// Socket.io
+// ======================================================
+function connectSocket(serverUrl, seatId) {
+  socket = io(serverUrl);
+
+  socket.on('connect', () => {
+    connDot.className = 'connected';
+    socket.emit('register-client', { seatId, bgImageUrl: '' });
+  });
+
+  socket.on('disconnect', () => {
+    connDot.className = '';
+  });
+
+  socket.on('duplicate-seat', () => {
+    socket.disconnect();
+    main.style.display = 'none';
+    setupModal.style.display = 'flex';
+    document.getElementById('duplicate-error').style.display = 'block';
+  });
+
+  // ストローク復元
+  socket.on('restore-strokes', (strokes) => {
+    strokeHistory.length = 0;
+    for (const s of strokes) strokeHistory.push(s);
+    redrawAll();
+  });
+
+  // クリア（親機から）
+  socket.on('clear', () => {
+    strokeHistory.length = 0;
+    fillImageUrl = '';
+    isConfirmed  = false;
+    redrawAll();
+    judgeOverlay.classList.remove('show');
+    judgeImg.src = '';
+  });
+
+  socket.on('clear-strokes-only', () => {
+    strokeHistory.length = 0;
+    redrawAll();
+  });
+
+  // ロック
+  socket.on('lock', () => {
+    isLocked = true;
+    if (!isConfirmed) {
+      document.getElementById('lock-icon').textContent = '🔒';
+      document.getElementById('lock-msg').textContent  = '回答締切';
+    }
+    lockOverlay.style.background = `rgba(0,0,0,${lockDarkness / 100})`;
+    lockOverlay.classList.add('active');
+  });
+  socket.on('unlock', () => {
+    isLocked     = false;
+    isConfirmed  = false;
+    btnConfirm.disabled = false;
+    document.getElementById('lock-icon').textContent = '🔒';
+    document.getElementById('lock-msg').textContent  = '回答締切';
+    lockOverlay.classList.remove('active');
+  });
+  socket.on('lock-darkness', ({ value }) => {
+    lockDarkness = value;
+    if (lockOverlay.classList.contains('active')) {
+      lockOverlay.style.background = `rgba(0,0,0,${lockDarkness / 100})`;
+    }
+  });
+
+  // 正誤判定
+  socket.on('show-overlay', ({ imageUrl }) => {
+    if (!imageUrl) return;
+    const isFill = /fill/i.test(imageUrl.split('/').pop());
+    if (isFill) {
+      fillImageUrl = imageUrl;
+      redrawAll();
+      judgeOverlay.classList.remove('show');
+      judgeImg.src = '';
+    } else {
+      judgeImg.src = imageUrl;
+      judgeOverlay.classList.add('show');
+    }
+  });
+  socket.on('clear-overlay', () => {
+    judgeOverlay.classList.remove('show');
+    judgeImg.src = '';
+    fillImageUrl = '';
+    redrawAll();
+  });
+
+  // full-state（再接続時の状態復元）
+  socket.on('full-state', (state) => {
+    const seat = state.seats.find(s => String(s.seatId) === String(seatId));
+    if (seat) {
+      strokeHistory.length = 0;
+      for (const s of (seat.strokes || [])) strokeHistory.push(s);
+      redrawAll();
+      if (seat.locked) {
+        isLocked = true;
+        lockOverlay.classList.add('active');
+      }
+    }
+  });
+}
+</script>
+</body>
+</html>

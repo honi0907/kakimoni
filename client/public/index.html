@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>KakiMoni 子機 - 設定</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f0f1a; color: #eee; font-family: 'Montserrat', sans-serif;
+         min-height: 100vh; display: flex; align-items: center;
+         justify-content: center; padding: 20px; }
+  .box {
+    background: #1e1e2e; border: 2px solid #4a4a8a; border-radius: 20px;
+    padding: 40px 36px; width: 100%; max-width: 460px;
+  }
+  h1 { color: #a78bfa; font-size: 1.6rem; margin-bottom: 6px; }
+  .subtitle { color: #6b7280; font-size: 0.9rem; margin-bottom: 32px; }
+  label { display: block; color: #94a3b8; font-size: 0.9rem; margin-bottom: 6px; }
+  input {
+    width: 100%; padding: 12px 16px; border-radius: 10px;
+    background: #2d2d4a; border: 2px solid #4a4a8a; color: #eee;
+    font-size: 1.1rem; margin-bottom: 24px; outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus { border-color: #a78bfa; }
+  .host-hint {
+    font-size: 0.8rem; color: #6b7280; margin-top: -18px;
+    margin-bottom: 24px;
+  }
+  .buttons {
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .page-btn {
+    display: block; width: 100%; padding: 16px;
+    border: none; border-radius: 12px; font-size: 1.1rem;
+    font-weight: bold; cursor: pointer; text-decoration: none;
+    text-align: center; transition: opacity 0.2s;
+  }
+  .page-btn:hover { opacity: 0.85; }
+  .btn-client  { background: #7c3aed; color: #fff; }
+  .btn-display { background: #1d4ed8; color: #fff; }
+  .status {
+    margin-top: 20px; padding: 12px 16px; border-radius: 10px;
+    background: #2d2d4a; font-size: 0.85rem; color: #94a3b8;
+    display: none;
+  }
+  .status.ok  { background: #064e3b; color: #6ee7b7; display: block; }
+  .status.err { background: #7f1d1d; color: #fca5a5; display: block; }
+  .divider { border: none; border-top: 1px solid #2d2d55; margin: 24px 0; }
+  .saved-tag {
+    display: inline-block; background: #1d4ed8; color: #bfdbfe;
+    border-radius: 6px; padding: 2px 10px; font-size: 0.75rem; margin-left: 8px;
+  }
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>✏️ KakiMoni 子機</h1>
+  <p class="subtitle">接続する前に親機サーバーのIPアドレスを設定してください</p>
+
+  <label for="host-input">
+    親機サーバーのIPアドレス
+    <span id="saved-tag" class="saved-tag" style="display:none">保存済み</span>
+  </label>
+  <input id="host-input" type="text" placeholder="例: 192.168.1.5" autocomplete="off" inputmode="numeric">
+  <p class="host-hint">ポートは自動で :3000 が使われます（変更不要）</p>
+
+  <div class="buttons">
+    <button class="page-btn btn-client" onclick="goPage('client')">
+      ✏️ 子機（回答書き）
+    </button>
+    <button class="page-btn btn-display" onclick="goPage('client-display')">
+      🪟 子機のセカンド（大型モニター）
+    </button>
+  </div>
+
+  <div id="status"></div>
+
+  <hr class="divider">
+  <div style="font-size:0.8rem; color:#4b5563; line-height:1.8;">
+    <div>・「子機（回答書き）」→ 演者が持つタブレット</div>
+    <div>・「子機のセカンド」→ 演者席前の大型モニター</div>
+    <div>・同じ席番号を子機と子機セカンドで合わせてください</div>
+  </div>
+</div>
+
+<script>
+const hostInput = document.getElementById('host-input');
+const statusEl  = document.getElementById('status');
+const savedTag  = document.getElementById('saved-tag');
+
+// 保存済みIPを復元
+const saved = localStorage.getItem('kakimoni_host');
+if (saved) {
+  hostInput.value = saved;
+  savedTag.style.display = 'inline-block';
+}
+
+hostInput.addEventListener('input', () => {
+  savedTag.style.display = 'none';
+});
+
+function saveHost() {
+  const val = hostInput.value.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+  if (!val) {
+    statusEl.textContent = 'IPアドレスを入力してください';
+    statusEl.className   = 'status err';
+    return null;
+  }
+  // ポートが含まれていなければ :3000 を付ける
+  const host = val.includes(':') ? val : val + ':3000';
+  localStorage.setItem('kakimoni_host', host);
+  return host;
+}
+
+function goPage(page) {
+  const host = saveHost();
+  if (!host) return;
+  // URLパラメータにもホストを付けて遷移（ページ側でも読める）
+  window.location.href = `/${page}/?server=${encodeURIComponent(host)}`;
+}
+</script>
+</body>
+</html>

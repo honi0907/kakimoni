@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KakiMoni - 親機セカンド</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #000; color: #eee; font-family: 'Montserrat', sans-serif;
+    width: 100vw; height: 100vh; overflow: hidden;
+  }
+  #waiting {
+    width: 100vw; height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 10px;
+    font-size: 1.3rem; color: #374151;
+  }
+  #waiting small { font-size: 0.85rem; color: #1f2937; }
+  #hd-group-badge {
+    font-size: 0.7rem; color: #4b5563;
+    background: #111827; border: 1px solid #1f2937;
+    padding: 2px 8px; border-radius: 3px; letter-spacing: 0.05em;
+  }
+  #layout-grid {
+    display: none;
+    width: 100vw; height: 100vh;
+    gap: 2px; background: #111;
+  }
+  #layout-grid.active { display: grid; }
+  .layout-cell {
+    position: relative; overflow: hidden; background: #fff;
+  }
+  .cell-canvas {
+    width: 100%; height: 100%; display: block; position: absolute; inset: 0; z-index: 9;
+  }
+  .empty-cell { background: #000; }
+  .layout-cell.keep-ratio { background: #000 !important; }
+  /* 判定オーバ�Eレイ */
+  .cell-judge-overlay {
+    display: none; position: absolute; inset: 0; z-index: 20;
+    align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  .cell-judge-overlay.show { display: flex; }
+  .cell-judge-overlay img {
+    max-width: 80%; max-height: 80%; object-fit: contain;
+  }
+  /* 名前ラベル */
+  .cell-name-label {
+    display: none;
+    position: absolute;
+    pointer-events: none;
+    z-index: 25;
+    white-space: nowrap;
+    line-height: 1.3;
+    border-radius: 3px;
+  }
+  /* 選択肢オーバ�Eレイ */
+  .cell-choice-overlay {
+    display: none; position: absolute; inset: 0; z-index: 12;
+    align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  .cell-choice-overlay.show { display: flex; }
+  .cell-choice-overlay img {
+    width: 100%; height: 100%; object-fit: contain;
+  }
+  /* 未接続オーバーレイ */
+  .disconnected-overlay {
+    display: none;
+    position: absolute; inset: 0; z-index: 10;
+    background: #111;
+    flex-direction: column;
+    align-items: center; justify-content: center;
+    pointer-events: none;
+    color: #555;
+    font-size: clamp(8px, 1.8vw, 16px);
+    letter-spacing: 0.1em;
+  }
+</style>
+</head>
+<body>
+<div id="waiting">
+  📺 レイアウト未設定
+  <span id="hd-group-badge">GROUP: default</span>
+  <small>親機から 💺レイアウト を適用してください</small>
+</div>
+<div id="layout-grid"></div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const waiting    = document.getElementById('waiting');
+const layoutGrid = document.getElementById('layout-grid');
+
+// URLパラメータからグループID取征E
+const HD_GROUP = new URLSearchParams(location.search).get('group') || 'default';
+document.getElementById('hd-group-badge').textContent = 'GROUP: ' + HD_GROUP;
+
+// seatId -> { canvas, ctx, strokes, currentStroke, bgImg }
+const seatData = new Map();
+let currentLayout = null;
+let currentKeepRatio = false;
+let socket = null;
+let hdLabelConfig = null;  // ラベル設宁E
+const hdSeatNames = {};    // seatId -> name
+let hdCurrentChoiceUrl = null; // 選択肢画像URL
+let judgeColorMode = false;
+const connectedSeats = new Set(); // 接続中seatId
+
+function applyHdCellLabel(seatId) {
+  const d = seatData.get(String(seatId));
+  if (!d || !d.cellEl) return;
+  let el = d.cellEl.querySelector('.cell-name-label');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'cell-name-label';
+    d.cellEl.appendChild(el);
+  }
+  const name = hdSeatNames[String(seatId)] || '';
+  if (!hdLabelConfig || !hdLabelConfig.enabled || !name) {
+    el.style.display = 'none';
+    return;
+  }
+  el.textContent = name;
+  el.style.display = 'block';
+  el.style.left = hdLabelConfig.x + '%';
+  el.style.top  = hdLabelConfig.y + '%';
+  const align = hdLabelConfig.textAlign || 'left';
+  el.style.transform = align === 'center' ? 'translateX(-50%)'
+                     : align === 'right'  ? 'translateX(-100%)' : 'none';
+  el.style.textAlign   = align;
+  // セルの高さに対してフォントサイズをスケール
+  const cellH = d.cellEl.offsetHeight || window.innerHeight;
+  const scale = Math.max(0.05, Math.min(1, cellH / window.innerHeight));
+  el.style.fontSize    = Math.round(hdLabelConfig.fontSize * scale) + 'px';
+  el.style.fontFamily  = hdLabelConfig.fontFamily;
+  el.style.fontWeight  = hdLabelConfig.bold   ? 'bold'   : 'normal';
+  el.style.fontStyle   = hdLabelConfig.italic ? 'italic' : 'normal';
+  el.style.color       = hdLabelConfig.color;
+  const bg = hdLabelConfig.bgColor || 'rgba(0,0,0,0)';
+  el.style.backgroundColor = bg;
+  el.style.padding = bg.endsWith(',0)') ? '0' : Math.round(hdLabelConfig.bgPadding * scale) + 'px';
+  if (hdLabelConfig.shadowEnabled) {
+    const { shadowOffsetX: ox, shadowOffsetY: oy, shadowBlur: bl, shadowColor: sc } = hdLabelConfig;
+    el.style.textShadow = `${ox}px ${oy}px ${bl}px ${sc}`;
+  } else {
+    el.style.textShadow = '';
+  }
+}
+
+function applyAllHdLabels() {
+  for (const [id] of seatData) applyHdCellLabel(id);
+}
+
+function applyHdChoice(url) {
+  hdCurrentChoiceUrl = url;
+  document.querySelectorAll('.layout-cell:not(.cell-text-only):not(.empty-cell)').forEach(cell => {
+    let ov = cell.querySelector('.cell-choice-overlay');
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.className = 'cell-choice-overlay';
+      const img = document.createElement('img');
+      img.alt = '';
+      ov.appendChild(img);
+      cell.appendChild(ov);
+    }
+    ov.querySelector('img').src = url;
+    ov.classList.add('show');
+  });
+}
+function clearHdChoice() {
+  hdCurrentChoiceUrl = null;
+  document.querySelectorAll('.cell-choice-overlay').forEach(ov => ov.classList.remove('show'));
+}
+
+function connect() {
+  socket = io();
+  socket.on('connect', () => { socket.emit('register-host-display', { group: HD_GROUP }); });
+
+  socket.on('full-state', (state) => {
+    connectedSeats.clear();
+    for (const s of state.seats) {
+      let d = seatData.get(String(s.seatId));
+      if (!d) { d = { canvas: null, ctx: null, strokes: [], currentStroke: null, bgImg: null, overlayEl: null }; seatData.set(String(s.seatId), d); }
+      d.strokes = [...(s.strokes || [])];
+      if (s.bgImageUrl) loadBg(d, s.bgImageUrl);
+      if (s.connected) connectedSeats.add(String(s.seatId));
+    }
+    if (state.choiceImageUrl) applyHdChoice(state.choiceImageUrl);
+    else clearHdChoice();
+    if (typeof state.judgeColorMode !== 'undefined') judgeColorMode = !!state.judgeColorMode;
+    if (currentLayout) applyLayout(currentLayout);
+    updateDisconnectedOverlays();
+  });
+
+  socket.on('display-layout', (layout) => {
+    currentLayout = layout;
+    applyLayout(layout);
+    console.log('[debug] display-layout: connectedSeats=', [...connectedSeats], 'seatData keys=', [...seatData.keys()]);
+    for (const [id, d] of seatData) {
+      if (d.overlayEl) console.log('[debug] seat', id, 'overlay display=', d.overlayEl.style.display, 'has=', connectedSeats.has(id));
+    }
+    updateDisconnectedOverlays();
+    console.log('[debug] after update:');
+    for (const [id, d] of seatData) {
+      if (d.overlayEl) console.log('[debug] seat', id, 'overlay display=', d.overlayEl.style.display);
+    }
+  });
+
+  socket.on('label-config', (config) => {
+    hdLabelConfig = config;
+    applyAllHdLabels();
+  });
+
+  socket.on('seat-label-name', ({ seatId: sid, name }) => {
+    hdSeatNames[String(sid)] = name;
+    applyHdCellLabel(String(sid));
+  });
+
+  socket.on('stroke-start', ({ seatId, stroke }) => {
+    let d = seatData.get(String(seatId));
+    if (!d) { d = { canvas: null, ctx: null, strokes: [], currentStroke: null, bgImg: null, overlayEl: null }; seatData.set(String(seatId), d); }
+    d.currentStroke = { ...stroke, points: [...(stroke.points || [])] };
+    if (d.ctx) drawSegment(d);
+  });
+  socket.on('stroke-point', ({ seatId, point }) => {
+    const d = seatData.get(String(seatId));
+    if (!d || !d.currentStroke) return;
+    d.currentStroke.points.push(point);
+    if (d.ctx) drawSegment(d);
+  });
+  socket.on('stroke-end', ({ seatId }) => {
+    const d = seatData.get(String(seatId));
+    if (!d || !d.currentStroke) return;
+    d.strokes.push(d.currentStroke);
+    d.currentStroke = null;
+  });
+  socket.on('canvas-cleared', ({ seatId }) => {
+    const d = seatData.get(String(seatId));
+    if (!d) return;
+    d.strokes = []; d.currentStroke = null;
+    d.judging = false; d.fillImg = null; d.fillImageUrl = null;
+    if (d.ctx) redraw(d);
+    // 判定オーバ�Eレイも消去
+    if (d.cellEl) { const ov = d.cellEl.querySelector('.cell-judge-overlay'); if (ov) ov.classList.remove('show'); }
+  });
+  socket.on('seat-strokes-updated', ({ seatId, strokes }) => {
+    const d = seatData.get(String(seatId));
+    if (!d) return;
+    d.strokes = [...strokes];
+    if (d.ctx) redraw(d);
+  });
+  socket.on('bg-updated', ({ seatId, bgImageUrl }) => {
+    const d = seatData.get(String(seatId));
+    if (!d) return;
+    loadBg(d, bgImageUrl);
+  });
+
+  socket.on('judge-result', ({ seatId, imageUrl }) => {
+    const d = seatData.get(String(seatId));
+    if (!d || !d.cellEl) return;
+    const isFill = /fill/i.test(imageUrl.split('/').pop());
+    if (isFill) {
+      d.judging = true;
+      d.fillImageUrl = imageUrl;
+      const img = new Image();
+      img.onload = () => { d.fillImg = img; if (d.ctx) redraw(d); };
+      img.src = imageUrl;
+      const ov = d.cellEl.querySelector('.cell-judge-overlay');
+      if (ov) ov.classList.remove('show');
+    } else {
+      d.judging = false;
+      d.fillImageUrl = null; d.fillImg = null;
+      if (d.ctx) redraw(d);
+      let ov = d.cellEl.querySelector('.cell-judge-overlay');
+      if (!ov) {
+        ov = document.createElement('div');
+        ov.className = 'cell-judge-overlay';
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        ov.appendChild(img);
+        d.cellEl.appendChild(ov);
+      } else {
+        ov.querySelector('img').src = imageUrl;
+      }
+      ov.classList.add('show');
+    }
+  });
+
+  socket.on('clear-overlay', (data) => {
+    const clearOne = (d) => {
+      if (!d?.cellEl) return;
+      const ov = d.cellEl.querySelector('.cell-judge-overlay');
+      if (ov) ov.classList.remove('show');
+      d.judging = false; d.fillImageUrl = null; d.fillImg = null;
+      if (d.ctx) redraw(d);
+    };
+    if (data?.seatId) {
+      clearOne(seatData.get(String(data.seatId)));
+    } else {
+      for (const d of seatData.values()) clearOne(d);
+    }
+  });
+
+  socket.on('show-choice', ({ imageUrl }) => {
+    if (imageUrl) applyHdChoice(imageUrl); else clearHdChoice();
+  });
+  socket.on('clear-choice', () => { clearHdChoice(); });
+  socket.on('judge-color-mode', ({ enabled }) => {
+    judgeColorMode = enabled;
+    for (const d of seatData.values()) { if (d.ctx) redraw(d); }
+  });
+}
+
+// ====================================================
+// レイアウト適用
+// ====================================================
+function applyLayout(layout) {
+  waiting.style.display = 'none';
+  layoutGrid.classList.add('active');
+  layoutGrid.innerHTML = '';
+
+  // 旧canvasの参�EをリセチE��
+  for (const [, d] of seatData) { d.canvas = null; d.ctx = null; d.cellEl = null; d.overlayEl = null; }
+
+  if (layout.type === 'free') {
+    // ─── フリーモーチE───
+    layoutGrid.style.display = 'block';
+    layoutGrid.style.position = 'relative';
+    layoutGrid.style.gridTemplateColumns = '';
+    layoutGrid.style.gridTemplateRows    = '';
+    // 背景画像適用
+    if (layout.bgUrl) {
+      layoutGrid.style.backgroundImage    = `url("${layout.bgUrl}")`;
+      layoutGrid.style.backgroundSize     = 'cover';
+      layoutGrid.style.backgroundPosition = 'center';
+    } else {
+      layoutGrid.style.backgroundImage = '';
+    }
+
+    for (const cell of layout.cells) {
+      const div = document.createElement('div');
+      div.style.cssText = `position:absolute;left:${cell.x}%;top:${cell.y}%;width:${cell.w}%;height:${cell.h}%;overflow:hidden;`;
+      if (!cell.seatId) {
+        div.className = 'layout-cell empty-cell';
+        const emt = document.createElement('div');
+        emt.className = 'disconnected-overlay';
+        emt.style.display = 'flex';
+        emt.textContent = '未接続';
+        div.appendChild(emt);
+        layoutGrid.appendChild(div);
+        continue;
+      }
+      div.className = 'layout-cell';
+      const canvas = document.createElement('canvas');
+      canvas.className = 'cell-canvas';
+      div.appendChild(canvas);
+      layoutGrid.appendChild(div);
+
+      if (cell.seatId) {
+        let d = seatData.get(String(cell.seatId));
+        if (!d) { d = { canvas: null, ctx: null, strokes: [], currentStroke: null, bgImg: null, overlayEl: null }; seatData.set(String(cell.seatId), d); }
+        d.canvas = canvas;
+        d.ctx    = canvas.getContext('2d');
+        d.cellEl = div;
+        const ov = document.createElement('div');
+        ov.className = 'disconnected-overlay';
+        ov.textContent = '未接続';
+        div.appendChild(ov);
+        d.overlayEl = ov;
+      }
+    }
+  } else {
+    // ─── グリチE��モーチE(type:'grid' また�E 旧フォーマッチE ───
+    layoutGrid.style.display = '';
+    layoutGrid.style.position = '';
+    layoutGrid.style.backgroundImage = '';
+    layoutGrid.style.gridTemplateColumns = `repeat(${layout.cols}, 1fr)`;
+    layoutGrid.style.gridTemplateRows    = `repeat(${layout.rows}, 1fr)`;
+    currentKeepRatio = !!layout.keepRatio;
+
+    for (let i = 0; i < layout.rows * layout.cols; i++) {
+      const seatId = layout.cells[i];
+      const cell = document.createElement('div');
+      if (!seatId) {
+        cell.className = 'layout-cell empty-cell' + (currentKeepRatio ? ' keep-ratio' : '');
+        const emt = document.createElement('div');
+        emt.className = 'disconnected-overlay';
+        emt.style.display = 'flex';
+        emt.textContent = '未接続';
+        cell.appendChild(emt);
+        layoutGrid.appendChild(cell);
+        continue;
+      }
+      cell.className = 'layout-cell' + (currentKeepRatio ? ' keep-ratio' : '');
+      const canvas = document.createElement('canvas');
+      canvas.className = 'cell-canvas';
+      cell.appendChild(canvas);
+      layoutGrid.appendChild(cell);
+
+      let d = seatData.get(String(seatId));
+      if (!d) { d = { canvas: null, ctx: null, strokes: [], currentStroke: null, bgImg: null, overlayEl: null }; seatData.set(String(seatId), d); }
+      d.canvas = canvas;
+      d.ctx    = canvas.getContext('2d');
+      d.cellEl = cell;
+      const ov = document.createElement('div');
+      ov.className = 'disconnected-overlay';
+      ov.textContent = '未接続';
+      cell.appendChild(ov);
+      d.overlayEl = ov;
+    }
+  }
+
+  // 選択肢画像を再適用
+  if (hdCurrentChoiceUrl) applyHdChoice(hdCurrentChoiceUrl);
+  requestAnimationFrame(() => {
+    for (const [id, d] of seatData) {
+      if (d.canvas) { resizeCanvas(d); redraw(d); }
+      applyHdCellLabel(id);
+    }
+    updateDisconnectedOverlays();
+  });
+}
+
+window.addEventListener('resize', () => {
+  for (const [, d] of seatData) {
+    if (d.canvas) { resizeCanvas(d); redraw(d); }
+  }
+  applyAllHdLabels();
+});
+
+// ====================================================
+// Canvas ヘルパ�E
+// ====================================================
+function loadBg(d, url) {
+  if (d.bgImg && d.bgImg.src === url) return;
+  const img = new Image();
+  img.onload = () => { d.bgImg = img; if (d.ctx) redraw(d); };
+  img.src = url;
+}
+
+function resizeCanvas(d) {
+  const r = window.devicePixelRatio || 1;
+  const cellW = d.canvas.parentElement.clientWidth;
+  const cellH = d.canvas.parentElement.clientHeight;
+  if (!cellW || !cellH) return;
+  let cw, ch, ox, oy;
+  if (currentKeepRatio) {
+    const targetRatio = 16 / 9;
+    if (cellW / cellH > targetRatio) {
+      ch = cellH; cw = Math.round(ch * targetRatio);
+    } else {
+      cw = cellW; ch = Math.round(cw / targetRatio);
+    }
+    ox = Math.round((cellW - cw) / 2);
+    oy = Math.round((cellH - ch) / 2);
+  } else {
+    cw = cellW; ch = cellH; ox = 0; oy = 0;
+  }
+  d.canvas.width  = Math.floor(cw * r);
+  d.canvas.height = Math.floor(ch * r);
+  d.canvas.style.width  = cw + 'px';
+  d.canvas.style.height = ch + 'px';
+  d.canvas.style.left   = ox + 'px';
+  d.canvas.style.top    = oy + 'px';
+  d.canvas.style.right  = '';
+  d.canvas.style.bottom = '';
+  d.canvas.style.background = currentKeepRatio ? '#fff' : '';
+  d.ctx.setTransform(1, 0, 0, 1, 0, 0);
+  d.ctx.scale(r, r);
+}
+
+function clearCanvas(d) {
+  const w = d.canvas.width  / (window.devicePixelRatio || 1);
+  const h = d.canvas.height / (window.devicePixelRatio || 1);
+  d.ctx.clearRect(0, 0, w, h);
+}
+
+function redraw(d) {
+  clearCanvas(d);
+  // fill 画像は cell の background として適用（canvas は透明のままにする）
+  if (d.cellEl) {
+    d.cellEl.style.backgroundImage    = d.fillImageUrl ? `url('${d.fillImageUrl}')` : '';
+    d.cellEl.style.backgroundSize     = d.fillImageUrl ? '100% 100%' : '';
+    d.cellEl.style.backgroundRepeat   = d.fillImageUrl ? 'no-repeat' : '';
+    d.cellEl.style.backgroundPosition = d.fillImageUrl ? 'center' : '';
+  }
+  const w = d.canvas.width  / (window.devicePixelRatio || 1);
+  const h = d.canvas.height / (window.devicePixelRatio || 1);
+  if (d.bgImg) {
+    const sc = Math.max(w / d.bgImg.naturalWidth, h / d.bgImg.naturalHeight);
+    const dw = d.bgImg.naturalWidth * sc, dh = d.bgImg.naturalHeight * sc;
+    d.ctx.drawImage(d.bgImg, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  }
+  const inv = judgeColorMode && d.judging;
+  for (const s of d.strokes) drawFullStroke(d.ctx, d.canvas, s, inv);
+  if (d.currentStroke) drawFullStroke(d.ctx, d.canvas, d.currentStroke, inv);
+}
+
+function strokeCtx(ctx, canvas, stroke, inv = false) {
+  const dispW = canvas.width  / (window.devicePixelRatio || 1);
+  const dispH = canvas.height / (window.devicePixelRatio || 1);
+  const sx = stroke.srcW ? dispW / stroke.srcW : 1;
+  const sy = stroke.srcH ? dispH / stroke.srcH : 1;
+  ctx.save();
+  if (stroke.tool === 'eraser') {
+    ctx.globalCompositeOperation = 'destination-out'; ctx.strokeStyle = 'rgba(0,0,0,1)';
+  } else {
+    ctx.globalCompositeOperation = 'source-over'; ctx.strokeStyle = inv ? invertColor(stroke.color) : stroke.color;
+  }
+  ctx.lineWidth = Math.max(1, stroke.size * Math.min(sx, sy));
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  return { sx, sy };
+}
+
+function invertColor(hex) {
+  if (!hex || hex[0] !== '#' || hex.length !== 7) return hex;
+  const r = 255 - parseInt(hex.slice(1, 3), 16);
+  const g = 255 - parseInt(hex.slice(3, 5), 16);
+  const b = 255 - parseInt(hex.slice(5, 7), 16);
+  return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+function drawFullStroke(ctx, canvas, stroke, inv = false) {
+  if (!stroke.points || stroke.points.length < 1) return;
+  const { sx, sy } = strokeCtx(ctx, canvas, stroke, inv);
+  ctx.beginPath();
+  ctx.moveTo(stroke.points[0].x * sx, stroke.points[0].y * sy);
+  for (let i = 1; i < stroke.points.length; i++) {
+    const p = stroke.points[i - 1], c = stroke.points[i];
+    ctx.quadraticCurveTo(p.x * sx, p.y * sy, (p.x + c.x) / 2 * sx, (p.y + c.y) / 2 * sy);
+  }
+  ctx.stroke(); ctx.restore();
+}
+
+function drawSegment(d) {
+  const pts = d.currentStroke.points;
+  if (pts.length < 2) return;
+  const inv = judgeColorMode && d.judging;
+  const { sx, sy } = strokeCtx(d.ctx, d.canvas, d.currentStroke, inv);
+  d.ctx.beginPath();
+  if (pts.length === 2) {
+    d.ctx.moveTo(pts[0].x * sx, pts[0].y * sy);
+    d.ctx.lineTo(pts[1].x * sx, pts[1].y * sy);
+  } else {
+    const pp = pts[pts.length - 3], pv = pts[pts.length - 2], cu = pts[pts.length - 1];
+    d.ctx.moveTo((pp.x + pv.x) / 2 * sx, (pp.y + pv.y) / 2 * sy);
+    d.ctx.quadraticCurveTo(pv.x * sx, pv.y * sy, (pv.x + cu.x) / 2 * sx, (pv.y + cu.y) / 2 * sy);
+  }
+  d.ctx.stroke(); d.ctx.restore();
+}
+
+function updateDisconnectedOverlays() {
+  for (const [id, d] of seatData) {
+    if (d.overlayEl) d.overlayEl.style.display = connectedSeats.has(id) ? 'none' : 'flex';
+  }
+}
+
+connect();
+</script>
+</body>
+</html>

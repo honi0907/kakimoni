@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KakiMoni 親機</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f0f1a; color: #eee; font-family: 'Montserrat', sans-serif;
+         min-height: 100vh; display: flex; align-items: center;
+         justify-content: center; padding: 20px; }
+  .box {
+    background: #1e1e2e; border: 2px solid #4a4a8a; border-radius: 20px;
+    padding: 40px 36px; width: 100%; max-width: 500px; text-align: center;
+  }
+  h1 { color: #a78bfa; font-size: 1.8rem; margin-bottom: 8px; }
+  .subtitle { color: #6b7280; font-size: 0.95rem; margin-bottom: 36px; }
+  .buttons { display: flex; flex-direction: column; gap: 14px; }
+  .page-btn {
+    display: block; padding: 20px; border: none; border-radius: 14px;
+    font-size: 1.15rem; font-weight: bold; cursor: pointer;
+    text-decoration: none; text-align: left;
+    transition: opacity 0.2s, transform 0.1s;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .page-btn:hover { opacity: 0.9; transform: translateX(2px); }
+  .btn-host    { background: #4c1d95; color: #fff; }
+  .btn-display { background: #1e3a5f; color: #fff; }
+  .page-btn .icon { font-size: 2rem; flex-shrink: 0; }
+  .page-btn .text .title { font-size: 1.1rem; }
+  .page-btn .text .desc  { font-size: 0.8rem; color: rgba(255,255,255,0.6); margin-top: 2px; }
+  .divider { border: none; border-top: 1px solid #2d2d55; margin: 28px 0; }
+  .ip-info {
+    background: #2d2d4a; border-radius: 10px; padding: 14px 18px;
+    font-size: 0.9rem; color: #94a3b8; text-align: left; line-height: 2;
+  }
+  .ip-info strong { color: #fbbf24; font-size: 1rem; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>🎛️ KakiMoni 親機</h1>
+  <p class="subtitle">使用するページを選択してください</p>
+  <div class="buttons">
+    <a class="page-btn btn-host" href="/host/">
+      <span class="icon">🎛️</span>
+      <div class="text">
+        <div class="title">親機（操作パネル）</div>
+        <div class="desc">全体コントロール・タイマー・回答オープン操作</div>
+      </div>
+    </a>
+    <a class="page-btn btn-display" href="/host-display/">
+      <span class="icon">📺</span>
+      <div class="text">
+        <div class="title">親機のセカンド（一覧表示）</div>
+        <div class="desc">LEDボード・プロジェクター・大型モニター用</div>
+      </div>
+    </a>
+  </div>
+  <hr class="divider">
+  <div class="ip-info" id="ip-info">
+    <div>このPCのIPアドレス（子機から接続するアドレス）:</div>
+    <div><strong id="ip-display">取得中...</strong></div>
+    <div style="font-size:0.8rem; margin-top:4px; color:#6b7280;">
+      子機アプリでこのIPアドレスを入力してください
+    </div>
+  </div>
+</div>
+<script>
+  // サーバーから提供されるので hostname でOK（別PCからアクセスしても表示用）
+  fetch('/api/ip').then(r => r.json()).then(d => {
+    document.getElementById('ip-display').textContent = d.ip + ':3000';
+  }).catch(() => {
+    document.getElementById('ip-display').textContent = location.hostname + ':3000';
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,2986 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KakiMoni - 親機（ホスト操作）</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #1a1a1a; --surface: #242424; --surface2: #2a2a2a;
+    --border: #3a3a3a; --accent: #7c3aed; --accent2: #4f46e5;
+    --green: #4ade80; --red: #ef4444; --yellow: #fbbf24; --blue: #60a5fa;
+    --orange: #f97316;
+    --ctrl-bg: #242424;
+  }
+  body { background: var(--bg); color: #e2e8f0; font-family: 'Montserrat', sans-serif;
+         min-height: 100vh; display: flex; flex-direction: column; }
+
+  /* ── トップバー ───────────────────────── */
+  #topbar {
+    background: var(--bg); border-bottom: 2px solid var(--border);
+    padding: 10px 20px; display: flex; align-items: center; gap: 16px;
+    flex-wrap: wrap; flex-shrink: 0;
+  }
+  #topbar h1 { font-size: 1.3rem; color: #a78bfa; white-space: nowrap; }
+  #conn-indicator {
+    font-size: 0.8rem; padding: 4px 12px; border-radius: 0;
+    background: #374151; color: #9ca3af;
+  }
+  #conn-indicator.ok { background: #065f46; color: var(--green); }
+
+  /* ── セーブステータス ───────────────────── */
+  #save-bar {
+    display: flex; align-items: center; gap: 10px;
+    margin-left: auto; font-size: 0.8rem;
+  }
+  #save-bar span { color: #94a3b8; }
+  #save-bar strong { color: #fbbf24; font-size: 0.95rem; }
+  #save-session-input, #save-counter-input {
+    width: 44px; padding: 3px 6px; background: #1e293b;
+    border: 1px solid #374151; color: #fbbf24;
+    font-size: 0.85rem; font-weight: bold; text-align: center;
+    border-radius: 0; outline: none;
+  }
+  #save-counter-input { width: 52px; }
+  #save-session-input:focus, #save-counter-input:focus { border-color: #4f46e5; }
+  #judge-invert-badge {
+    font-size: 0.78rem; font-weight: bold; padding: 2px 7px;
+    border-radius: 3px; border: 1px solid;
+    transition: background 0.2s, color 0.2s;
+  }
+  #judge-invert-badge.on  { background: #7c3aed; border-color: #a78bfa; color: #e9d5ff; }
+  #judge-invert-badge.off { background: #1e293b; border-color: #374151; color: #64748b; }
+  #save-toast {
+    position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+    background: #1e3a5f; border: 1px solid #2563eb; color: #7dd3fc;
+    padding: 8px 16px; font-size: 0.8rem; border-radius: 0;
+    opacity: 0; transition: opacity 0.3s; pointer-events: none;
+  }
+  #save-toast.show { opacity: 1; }
+
+  /* ── 全体コントロール ──────────────────── */
+  #global-ctrl {
+    background: var(--bg); padding: 10px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 2px solid var(--border);
+  }
+  .ctrl-left  { display: flex; align-items: center; gap: 10px; }
+  .ctrl-right { display: flex; align-items: center; gap: 8px; }
+  .ctrl-right-sep { width: 2px; height: 36px; background: #6b7280; flex-shrink: 0; margin: 0 8px; border-radius: 1px; }
+  .g-btn {
+    width: 88px; height: 72px; border: none; border-radius: 3px;
+    cursor: pointer; font-size: 0.75rem; font-weight: bold; padding: 0 4px;
+    transition: opacity 0.1s, box-shadow 0.1s, transform 0.1s;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center; white-space: nowrap; flex-shrink: 0;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.18);
+    position: relative;
+  }
+  .g-btn:hover { opacity: 0.92; box-shadow: 0 3px 0 rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.18); transform: translateY(1px); }
+  .g-btn:active { box-shadow: 0 1px 0 rgba(0,0,0,0.45), inset 0 2px 4px rgba(0,0,0,0.3); transform: translateY(3px); }
+  .btn-lock    { background: linear-gradient(180deg, #c2660a 0%, #b45309 100%); color: #fff; }
+  .btn-unlock  { background: linear-gradient(180deg, #293548 0%, #1e293b 100%); color: #94a3b8; border: 1px solid #374151; }
+  .btn-clear   { background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%); color: #fff; }
+  .btn-open    { background: linear-gradient(180deg, #0ea5e9 0%, #0891b2 100%); color: #fff; }
+  .btn-open.active {
+    background: linear-gradient(180deg, #0369a1 0%, #0ea5e9 100%);
+    box-shadow: inset 0 4px 10px rgba(0,0,0,0.55), inset 0 1px 3px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.08);
+    transform: translateY(2px);
+  }
+  .btn-close   { background: linear-gradient(180deg, #4b5563 0%, #374151 100%); color: #d1d5db; }
+  .btn-correct { background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%); color: #fecaca; }
+  .btn-correct.active {
+    background: linear-gradient(180deg, #991b1b 0%, #dc2626 100%);
+    box-shadow: inset 0 4px 10px rgba(0,0,0,0.55), inset 0 1px 3px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.08);
+    transform: translateY(2px);
+  }
+  .btn-incorrect { background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%); color: #bfdbfe; }
+  .ctrl-sep-vert { color: #4b5563; align-self: center; padding: 0 4px; }
+  .ctrl-label { font-size: 0.8rem; color: #94a3b8; white-space: nowrap; }
+
+  /* ── 席グリッド ───────────────────────── */
+  #seats-grid {
+    flex: 1; padding: 16px; display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(2, auto);
+    align-items: start;
+    gap: 12px; overflow-y: auto;
+  }
+
+  /* 席カード */
+  .seat-card {
+    background: var(--surface); border: 2px solid var(--border);
+    border-radius: 0; overflow: hidden; display: flex; flex-direction: column;
+    transition: border-color 0.2s;
+  }
+  /* 接続状態は opacity 差分のみで区別 (枠色なし) */
+  .seat-card.connected    { border-color: var(--border); }
+  .seat-card.selected     {
+    border-color: #22d3ee;
+    box-shadow: 0 0 0 2px rgba(34,211,238,0.35);
+  }
+  .seat-card.selected .seat-header { background: rgba(34,211,238,0.1); }
+
+  /* カードヘッダー */
+  .seat-header {
+    background: var(--surface2);
+    display: flex; flex-direction: column;
+    padding: 0; gap: 0;
+  }
+  /* 上段：通信状態 + 名前 */
+  .seat-header-info {
+    display: flex; align-items: center; gap: 6px;
+    padding: 0 10px; min-height: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  /* 下段：ロック + 選択 */
+  .seat-header-btns {
+    display: flex; align-items: stretch; min-height: 50px;
+  }
+  .seat-num {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--red); display: flex; align-items: center;
+    justify-content: center; font-weight: bold; font-size: 0.75rem; flex-shrink: 0;
+    transition: background 0.2s;
+  }
+  .seat-num.connected-num { background: var(--green); }
+  .seat-name { font-weight: bold; font-size: 0.82rem;
+               flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+               color: #cbd5e1; }
+
+  /* ロックオーバーレイ */
+  .seat-canvas-wrap {
+    position: relative; background: #fff; aspect-ratio: 16/9; overflow: hidden;
+  }
+  .seat-canvas { width: 100%; height: 100%; display: block; position: absolute; inset: 0; z-index: 9; }
+  .seat-bg-layer {
+    position: absolute; inset: 0; z-index: 11;
+    pointer-events: none;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+  }
+  .seat-name-label {
+    display: none; position: absolute; pointer-events: none;
+    z-index: 25; white-space: nowrap; line-height: 1.3; border-radius: 3px;
+  }
+
+  /* 待機中オーバーレイ */
+  .seat-placeholder {
+    position: absolute; inset: 0; z-index: 6;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(5,5,18,0.75);
+    color: #374151; font-size: 1.1rem; font-weight: bold; letter-spacing: 0.1em;
+    pointer-events: none;
+  }
+  .seat-card.connected .seat-placeholder { display: none; }
+
+  /* 判定画像オーバーレイ */
+  .seat-result-overlay {
+    position: absolute; inset: 0; z-index: 20;
+    display: none; align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  .seat-result-overlay.show { display: flex; }
+  /* 通常（中央配置）画像 */
+  .seat-result-overlay img {
+    max-width: 80%; max-height: 80%; object-fit: contain;
+  }
+  /* 全面フィル画像 */
+  .seat-result-overlay img.overlay-fill {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: fill;
+    animation: none;
+  }
+  /* 選択肢レイヤー */
+  .seat-choice-layer {
+    position: absolute; inset: 0; z-index: 12;
+    display: none; pointer-events: none;
+  }
+  .seat-choice-layer.show { display: flex; align-items: center; justify-content: center; }
+  .seat-choice-layer img { width: 100%; height: 100%; object-fit: contain; }
+
+  /* 未接続カードは全体を薄く */
+  .seat-card:not(.connected) { filter: brightness(0.5); }
+  .seat-card:not(.connected) .seat-ctrl { pointer-events: none; }
+  .seat-card:not(.connected) .seat-hbtn { pointer-events: none; }
+
+  /* ヘッダーゾーンボタン */
+  .seat-hbtn {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 0.95rem; font-weight: bold;
+    -webkit-user-select: none; user-select: none;
+    transition: filter 0.1s, box-shadow 0.1s, transform 0.1s;
+    border-left: 1px solid rgba(255,255,255,0.06);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -2px 0 rgba(0,0,0,0.3);
+  }
+  .seat-hbtn:hover { filter: brightness(1.1); }
+  .seat-hbtn:active { filter: brightness(0.85); box-shadow: inset 0 2px 4px rgba(0,0,0,0.35); }
+  /* ロックゾーン */
+  .s-lock-zone { background: linear-gradient(180deg, #293548 0%, #1e293b 100%); color: #94a3b8; }
+  .s-lock-zone.locked { background: linear-gradient(180deg, #c2660a 0%, #b45309 100%); color: #fff; }
+  /* 選択ゾーン */
+  .s-select-zone { background: linear-gradient(180deg, #293548 0%, #1e293b 100%); color: #94a3b8; }
+  .s-select-zone.selected { background: linear-gradient(180deg, #0dd4ef 0%, #06b6d4 100%); color: #fff; }
+  .s-select-zone.go-active {
+    background: linear-gradient(180deg, #0286a0 0%, #0dd4ef 100%);
+    box-shadow: inset 0 4px 10px rgba(0,0,0,0.55), inset 0 1px 3px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.08);
+    transform: translateY(2px);
+    color: #fff;
+  }
+
+  /* カード下部 */
+  .seat-ctrl {
+    border-top: 1px solid var(--border);
+    display: flex; align-items: stretch; min-height: 54px;
+  }
+  #selected-badge {
+    display: none; font-size: 0.75rem;
+    background: #06b6d4; color: #fff;
+    padding: 2px 8px; border-radius: 0; font-weight: bold;
+    position: absolute; top: -30px; left: 0; transform: none;
+    white-space: nowrap; width: 88px; text-align: center; box-sizing: border-box;
+  }
+  #selected-badge.visible { display: inline-block; }
+  #go-group { position: relative; display: flex; gap: 10px; align-items: center; }
+  /* 選択数バッジ */
+  .s-judge-kind {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; min-height: 50px;
+    background: linear-gradient(180deg, #dc2626 0%, #b91c1c 100%); color: #fecaca;
+    text-align: center; padding: 0 8px;
+    font-size: 1.05rem; border-radius: 0;
+    border: none; cursor: pointer; font-weight: bold;
+    transition: opacity 0.1s, box-shadow 0.1s, transform 0.1s;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15);
+  }
+  .s-judge-kind:hover { opacity: 0.92; box-shadow: 0 2px 0 rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15); transform: translateY(1px); }
+  .s-judge-kind:active { box-shadow: 0 0px 0 rgba(0,0,0,0.4), inset 0 2px 4px rgba(0,0,0,0.3); transform: translateY(3px); }
+  .s-judge-kind.incorrect { background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%); color: #bfdbfe; }
+  .s-judge-kind.judged {
+    box-shadow: inset 0 4px 10px rgba(0,0,0,0.55), inset 0 1px 3px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.08);
+    transform: translateY(2px);
+    filter: brightness(0.75);
+  }
+
+  #btn-roster-load {
+    background: #1e3a5f; color: #7dd3fc; border: 1px solid #2563eb;
+    border-radius: 0; padding: 8px 16px; font-size: 0.85rem; cursor: pointer;
+    font-weight: bold;
+  }
+  #btn-roster-load:hover { background: #2563eb; }
+  #roster-file-input { display: none; }
+
+  /* オーバーレイボタン */
+  .s-correct   { background: linear-gradient(180deg, #16a34a 0%, #166534 100%); color: #86efac;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15); border-radius: 2px; }
+  .s-incorrect { background: linear-gradient(180deg, #b91c1c 0%, #7f1d1d 100%); color: #fca5a5;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15); border-radius: 2px; }
+  .s-clr-ovl   { background: linear-gradient(180deg, #293548 0%, #1e293b 100%); color: #94a3b8;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1); border-radius: 2px; }
+  .overlay-select {
+    padding: 5px 7px; background: #2d2d4a; border: 1px solid var(--border);
+    border-radius: 0; color: #eee; font-size: 0.72rem; outline: none;
+    max-width: 100px;
+  }
+
+  /* ── レイアウトモーダル ────────────────────── */
+  #layout-modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.6);
+  }
+  #layout-modal-overlay.open { display: block; }
+  #layout-panel {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: #1a1a2e; border: 2px solid #4f46e5; border-radius: 6px;
+    padding: 20px; width: 620px; max-width: 95vw;
+  }
+  #layout-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  #layout-panel-header span { font-size: 1rem; font-weight: bold; color: #a78bfa; }
+  #layout-modal-close {
+    background: none; border: none; color: #6b7280; cursor: pointer;
+    font-size: 1.2rem; line-height: 1; padding: 0 4px;
+  }
+  #layout-modal-close:hover { color: #e2e8f0; }
+  /* モード切り替え */
+  #layout-mode-toggle {
+    display: flex; margin-bottom: 14px;
+    border: 1px solid #374151; border-radius: 3px; overflow: hidden;
+  }
+  .layout-mode-btn {
+    flex: 1; padding: 6px 0; background: #1e293b; border: none;
+    color: #6b7280; cursor: pointer; font-size: 0.8rem; font-weight: bold;
+    transition: background 0.15s;
+  }
+  .layout-mode-btn.active { background: #4f46e5; color: #fff; }
+  /* グリッドモード */
+  #layout-grid-section { display: block; }
+  #layout-grid-section.hidden { display: none; }
+  #layout-presets {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  .layout-preset-btn {
+    padding: 4px 10px; background: #2d2d4a; border: 1px solid #374151;
+    color: #94a3b8; cursor: pointer; font-size: 0.8rem; border-radius: 3px;
+  }
+  .layout-preset-btn:hover { background: #374151; color: #e2e8f0; }
+  .layout-preset-btn.active { background: #4f46e5; border-color: #7c3aed; color: #fff; }
+  #layout-editor-grid {
+    display: grid; gap: 6px; margin-bottom: 14px;
+  }
+  .layout-cell-btn {
+    height: 54px; background: #0d0d1a; border: 2px solid #374151;
+    color: #475569; cursor: pointer; font-size: 1.1rem; font-weight: bold;
+    border-radius: 4px; display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .layout-cell-btn.assigned { background: #1e3a5f; border-color: #4f46e5; color: #93c5fd; }
+  .layout-cell-btn:hover { border-color: #6b7280; }
+  /* フリーモード */
+  #layout-free-section { display: none; }
+  #layout-free-section.active { display: block; }
+  #free-canvas-wrap {
+    position: relative; width: 100%; padding-top: 56.25%;
+    background: #050510; border: 1px solid #374151; border-radius: 3px;
+    margin-bottom: 10px; overflow: hidden;
+  }
+  #free-canvas { position: absolute; inset: 0; }
+  .free-cell {
+    position: absolute; border: 2px solid #4f46e5;
+    background: rgba(15,20,50,0.7); box-sizing: border-box;
+    cursor: move; -webkit-user-select: none; user-select: none; min-width: 4%; min-height: 6%;
+  }
+  .free-cell-toolbar {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+    display: flex; align-items: center; gap: 3px;
+    padding: 2px 4px; background: rgba(0,0,0,0.7);
+  }
+  .free-cell-seat-sel {
+    flex: 1; min-width: 0; background: transparent; border: none;
+    color: #a5b4fc; font-size: 0.68rem; font-weight: bold; outline: none; cursor: pointer;
+  }
+  .free-cell-del {
+    background: none; border: none; color: #ef4444;
+    cursor: pointer; font-size: 0.72rem; padding: 0 2px; line-height: 1;
+    flex-shrink: 0;
+  }
+  /* リサイズハンドル */
+  .rh {
+    position: absolute; width: 9px; height: 9px;
+    background: #4f46e5; border: 1px solid #a5b4fc;
+    border-radius: 1px; z-index: 10;
+  }
+  .rh.anchor-active {
+    background: #f59e0b; border-color: #fcd34d;
+    box-shadow: 0 0 4px #f59e0b80;
+  }
+  .rh-nw { top:-5px; left:-5px;   cursor:nw-resize; }
+  .rh-n  { top:-5px; left:calc(50% - 4px); cursor:n-resize; }
+  .rh-ne { top:-5px; right:-5px;  cursor:ne-resize; }
+  .rh-e  { top:calc(50% - 4px); right:-5px; cursor:e-resize; }
+  .rh-se { bottom:-5px; right:-5px; cursor:se-resize; }
+  .rh-s  { bottom:-5px; left:calc(50% - 4px); cursor:s-resize; }
+  .rh-sw { bottom:-5px; left:-5px;  cursor:sw-resize; }
+  .rh-w  { top:calc(50% - 4px); left:-5px;  cursor:w-resize; }
+  .free-cell.selected, .free-cell.multi-selected {
+    border-color: #34d399 !important;
+    border-style: solid !important;
+    box-shadow: 0 0 0 2px #34d39980, 0 0 8px #34d39960 !important;
+  }
+  .free-cell.text-only {
+    background: transparent;
+    border: 2px dashed #f59e0b80;
+  }
+  .free-cell.text-only:hover { border-color: #f59e0b; border-style: dashed; }
+  .free-cell.text-only .free-cell-toolbar {
+    position: absolute; top: -20px; left: 0; right: 0; height: 18px;
+    background: rgba(245,158,11,0.85); border-radius: 3px 3px 0 0;
+    opacity: 0; transition: opacity 0.15s;
+  }
+  .free-cell.text-only:hover .free-cell-toolbar,
+  .free-cell.text-only.selected .free-cell-toolbar { opacity: 1; }
+  .free-cell.text-only .free-cell-pos-badge { display: none; }
+  .free-cell.text-only.selected, .free-cell.text-only.multi-selected {
+    border-color: #34d399 !important;
+    border-style: dashed !important;
+    box-shadow: 0 0 0 2px #34d39980, 0 0 8px #34d39960 !important;
+  }
+  #rubber-band {
+    position: absolute; border: 1px dashed #a78bfa;
+    background: rgba(99,102,241,0.12);
+    pointer-events: none; z-index: 50; box-sizing: border-box;
+  }
+  .free-cell-text-wrap {
+    position: absolute; inset: 0; z-index: 4;
+    display: flex; flex-direction: column;
+    pointer-events: none; overflow: hidden; padding: 2px;
+  }
+  .free-cell-text-label {
+    padding: 1px 3px; line-height: 1.2; word-break: break-word;
+    white-space: pre-wrap; max-width: 100%; font-size: 7px;
+  }
+  .text-only .free-cell-text-label { font-size: 0.9em; padding: 2px 6px; }
+  .fci-color-inp {
+    width: 22px; height: 18px; padding: 0; border: 1px solid #374151;
+    border-radius: 2px; cursor: pointer; background: none; flex-shrink: 0;
+  }
+  .fci-valign-btn, .fci-halign-btn {
+    padding: 1px 4px; font-size: 0.62rem; background: #1e293b;
+    border: 1px solid #374151; color: #6b7280; cursor: pointer; border-radius: 2px; line-height: 1.4;
+  }
+  .fci-valign-btn.active, .fci-halign-btn.active { background: #4f46e5; color: #fff; border-color: #818cf8; }
+  .free-cell-pos-badge {
+    position: absolute; top: 22px; left: 0; right: 0;
+    font-size: 0.55rem; color: rgba(165,180,252,0.75);
+    background: rgba(0,0,0,0.5); padding: 1px 4px;
+    pointer-events: none; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; line-height: 1.5;
+  }
+  #free-detail-bar {
+    display: none; align-items: center; gap: 10px; flex-wrap: wrap;
+    font-size: 0.7rem; color: #94a3b8;
+    padding: 4px 10px; background: #0a0a1a;
+    border: 1px solid #2d2d4a; border-radius: 3px;
+    margin-bottom: 6px;
+  }
+  #free-detail-bar .fdb-name { color: #a5b4fc; font-weight: bold; margin-right: 4px; }
+  #free-detail-bar .fdb-kv { color: #6b7280; font-size: 0.65rem; }
+  #free-detail-bar .fdb-kv span { color: #e2e8f0; }
+  #free-cell-inspector {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 8px; background: #0a0a1a;
+    border: 1px solid #2d2d4a; border-radius: 3px;
+    margin-bottom: 8px; min-height: 34px;
+  }
+  #fci-title {
+    color: #6b7280; font-size: 0.72rem; white-space: nowrap;
+    min-width: 60px;
+  }
+  #fci-inputs { display: none; gap: 5px; flex: 1; flex-wrap: wrap; align-items: center; }
+  .fci-group { display: flex; align-items: center; gap: 3px; }
+  .fci-label { color: #6b7280; font-size: 0.68rem; white-space: nowrap; }
+  .fci-inp {
+    width: 56px; background: #1e293b; border: 1px solid #374151;
+    color: #e2e8f0; font-size: 0.75rem; padding: 2px 5px;
+    border-radius: 2px; outline: none; text-align: right;
+    -moz-appearance: textfield; appearance: textfield;
+  }
+  .fci-inp::-webkit-inner-spin-button,
+  .fci-inp::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .fci-inp:focus { border-color: #4f46e5; }
+  #fci-lock-wrap {
+    display: flex; align-items: center; gap: 4px;
+    color: #94a3b8; font-size: 0.68rem; cursor: pointer;
+    -webkit-user-select: none; user-select: none; white-space: nowrap; margin-left: 2px;
+  }
+  #fci-lock-wrap input { cursor: pointer; accent-color: #4f46e5; }
+  /* アンカーピッカー */
+  #fci-anchor {
+    display: grid; grid-template-columns: repeat(3, 9px); gap: 2px;
+    flex-shrink: 0; margin-right: 2px;
+  }
+  .fci-anchor-dot {
+    width: 9px; height: 9px; border: none; border-radius: 1px;
+    background: #374151; cursor: pointer; padding: 0;
+  }
+  .fci-anchor-dot.active { background: #4f46e5; }
+  .fci-anchor-dot:hover:not(.active) { background: #6b7280; }
+  #add-btns-group { display: flex; gap: 6px; margin-bottom: 8px; }
+  #btn-add-free-cell {
+    flex: 1; padding: 5px; background: #1e293b;
+    border: 1px dashed #4f46e5; color: #a78bfa;
+    cursor: pointer; font-size: 0.8rem; border-radius: 3px;
+  }
+  #btn-add-free-cell:hover { background: #2d2d4a; }
+  #btn-add-text-cell {
+    flex: 1; padding: 5px; background: #1e293b;
+    border: 1px dashed #f59e0b; color: #fbbf24;
+    cursor: pointer; font-size: 0.8rem; border-radius: 3px;
+  }
+  #btn-add-text-cell:hover { background: #2d2215; }
+  #fci-text-section {
+    padding: 6px 8px; background: #0a0a1a;
+    border: 1px solid #2d2d4a; border-radius: 3px;
+    margin-bottom: 8px; font-size: 0.7rem;
+  }
+  #fci-text-section.no-selection { opacity: 0.3; pointer-events: none; }
+  /* BGピッカー */
+  #free-bg-picker {
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px 8px; background: #0a0a1a;
+    border: 1px solid #2d2d4a; border-radius: 3px;
+    margin-bottom: 8px; overflow-x: auto;
+  }
+  #free-bg-picker-label { font-size: 0.68rem; color: #4b5563; white-space: nowrap; flex-shrink: 0; }
+  .bg-thumb {
+    width: 48px; height: 27px; flex-shrink: 0;
+    border: 2px solid #374151; border-radius: 2px;
+    background-size: cover; background-position: center;
+    cursor: pointer; padding: 0;
+  }
+  .bg-thumb.selected { border-color: #f59e0b; box-shadow: 0 0 4px #f59e0b80; }
+  .bg-thumb:hover:not(.selected) { border-color: #6b7280; }
+  #free-bg-none {
+    font-size: 0.65rem; color: #6b7280; background: #1e293b;
+    border: 1px solid #374151; border-radius: 2px;
+    padding: 2px 7px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    line-height: 1.6;
+  }
+  #free-bg-none.selected { border-color: #f59e0b; color: #f59e0b; }
+  #free-bg-none:hover:not(.selected) { border-color: #6b7280; }
+  /* フリーレイアウト 保存スロット */
+  #free-save-area {
+    border: 1px solid #2d2d4a; border-radius: 3px;
+    padding: 6px 8px; margin-bottom: 8px; background: #0a0a1a;
+  }
+  #free-save-area-title {
+    font-size: 0.68rem; color: #4b5563; margin-bottom: 5px;
+  }
+  .free-save-row {
+    display: flex; align-items: center; gap: 4px; margin-bottom: 4px;
+  }
+  .free-save-row:last-child { margin-bottom: 0; }
+  .free-save-num {
+    font-size: 0.65rem; color: #4b5563; min-width: 14px;
+  }
+  .free-save-name {
+    flex: 1; background: #1e293b; border: 1px solid #2d2d4a;
+    color: #94a3b8; font-size: 0.7rem; padding: 2px 5px;
+    border-radius: 2px; outline: none;
+  }
+  .free-save-name.has-data { border-color: #4f46e5; color: #a5b4fc; }
+  .free-save-name:focus { border-color: #4f46e5; }
+  .free-save-btn {
+    padding: 2px 7px; font-size: 0.68rem; border: none;
+    border-radius: 2px; cursor: pointer; white-space: nowrap; line-height: 1.5;
+  }
+  .free-save-btn-save { background: #1e3a5f; color: #60a5fa; }
+  .free-save-btn-load { background: #1e293b; color: #94a3b8; }
+  .free-save-btn-del  { background: #2d0f0f; color: #ef4444; }
+  .free-save-btn:hover:not(:disabled) { opacity: 0.8; }
+  .free-save-btn:disabled { opacity: 0.3; cursor: default; }
+  #layout-modal-actions {
+    display: flex; gap: 8px; justify-content: flex-end;
+  }
+  #layout-apply-btn {
+    padding: 7px 20px; background: linear-gradient(180deg,#5b51e8,#4f46e5);
+    border: none; border-radius: 3px; color: #fff; font-weight: bold;
+    cursor: pointer; font-size: 0.9rem;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.4);
+  }
+  #layout-apply-btn:hover { opacity: 0.9; }
+  #layout-reset-btn {
+    padding: 7px 14px; background: #374151; border: none; border-radius: 3px;
+    color: #94a3b8; cursor: pointer; font-size: 0.9rem;
+  }
+  #layout-reset-btn:hover { background: #4b5563; color: #e2e8f0; }
+
+  /* ── 確認ダイアログ（confirm()はElectronでキーボードフォーカスを失うため使わない） ── */
+  #host-confirm-overlay {
+    position: fixed; inset: 0; z-index: 10000;
+    background: rgba(0,0,0,0.72);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.12s;
+  }
+  #host-confirm-overlay.show { opacity: 1; pointer-events: auto; }
+  #host-confirm-box {
+    background: #1e293b; border: 1px solid #4b5563; border-radius: 8px;
+    padding: 20px 24px; min-width: 260px; max-width: 340px;
+    display: flex; flex-direction: column; gap: 16px; text-align: center;
+  }
+  #host-confirm-msg { color: #e2e8f0; font-size: 0.9rem; line-height: 1.5; }
+  #host-confirm-btns { display: flex; gap: 8px; justify-content: center; }
+  #host-confirm-yes, #host-confirm-no {
+    padding: 6px 20px; border: none; border-radius: 4px;
+    cursor: pointer; font-size: 0.85rem;
+  }
+  #host-confirm-no { background: #374151; color: #9ca3af; }
+  #host-confirm-no:hover { background: #4b5563; color: #e2e8f0; }
+
+  /* ── 設定タブ ───────────────────────── */
+  #settings-modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.6);
+  }
+  #settings-modal-overlay.open { display: block; }
+  #settings-panel {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: #1a1a2e; border: 2px solid #4f46e5; border-radius: 6px;
+    padding: 20px; width: 680px; max-width: 95vw;
+    height: 88vh; max-height: 88vh; overflow-y: auto;
+  }
+  #settings-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  #settings-panel-header span { font-size: 1rem; font-weight: bold; color: #a78bfa; }
+  #settings-modal-close {
+    background: none; border: none; color: #6b7280; cursor: pointer;
+    font-size: 1.2rem; line-height: 1; padding: 0 4px;
+  }
+  #settings-modal-close:hover { color: #e2e8f0; }
+  .settings-row { display: flex; gap: 12px; align-items: flex-start; padding: 6px 0; }
+  .settings-desc { font-size: 0.75rem; color: #6b7280; margin-top: 4px; }
+  #settings-tabs {
+    display: flex; gap: 0; border-bottom: 1px solid #374151; margin-bottom: 14px;
+  }
+  .settings-tab-btn {
+    padding: 7px 18px; background: none; border: none; border-bottom: 2px solid transparent;
+    color: #6b7280; cursor: pointer; font-size: 0.88rem; font-weight: bold;
+    transition: color 0.15s;
+  }
+  .settings-tab-btn.active { color: #a78bfa; border-bottom-color: #a78bfa; }
+  .settings-tab-btn:hover:not(.active) { color: #c4b5fd; }
+  .settings-tab-pane { display: none; }
+  .settings-tab-pane.active { display: block; }
+  /* 名簿タブ内 */
+  #roster-tab-area { padding: 6px 0; }
+  #roster-hint { font-size: 0.75rem; color: #6b7280; margin-top: 8px; }
+  .label-section {
+    margin-bottom: 10px; padding: 10px; background: #0f0f1a;
+    border: 1px solid #2d2d55; border-radius: 4px;
+  }
+  .label-section-title {
+    font-size: 0.78rem; font-weight: bold; color: #94a3b8;
+    margin-bottom: 8px; letter-spacing: 0.05em;
+  }
+  .label-row {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+  }
+  .label-row:last-child { margin-bottom: 0; }
+  .label-row > label { font-size: 0.75rem; color: #94a3b8; width: 62px; flex-shrink: 0; }
+  .label-row input[type=range] { flex: 1; min-width: 0; }
+  .label-row select {
+    flex: 1; background: #1e293b; border: 1px solid #374151; color: #e2e8f0;
+    padding: 4px 6px; border-radius: 3px; font-size: 0.8rem;
+  }
+  .label-row input[type=color] {
+    width: 40px; height: 28px; border: 1px solid #374151;
+    background: none; cursor: pointer; border-radius: 3px; padding: 1px;
+  }
+  .lbl-val { font-size: 0.75rem; color: #fbbf24; width: 40px; text-align: right; flex-shrink: 0; }
+  .lbl-toggle-row { display: flex; align-items: center; gap: 10px; }
+  .lbl-toggle-row > label { font-size: 0.85rem; color: #e2e8f0; }
+  .lbl-style-btn {
+    padding: 3px 10px; background: #1e293b; border: 1px solid #374151;
+    color: #94a3b8; cursor: pointer; border-radius: 3px; font-size: 0.85rem;
+  }
+  .lbl-style-btn.active { border-color: #a78bfa; color: #a78bfa; background: #2d2d55; }
+  .lbl-align-btn {
+    padding: 3px 10px; background: #1e293b; border: 1px solid #374151;
+    color: #94a3b8; cursor: pointer; font-size: 0.8rem;
+  }
+  .lbl-align-btn.active { border-color: #7c3aed; color: #a78bfa; background: #2d2d55; }
+  #lbl-shadow-opts.hidden { display: none; }
+  #label-modal-actions {
+    display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;
+  }
+  #label-confirm-btn {
+    padding: 8px 20px; background: linear-gradient(180deg,#7c3aed,#6d28d9);
+    border: none; border-radius: 3px; color: #fff; font-weight: bold;
+    cursor: pointer; font-size: 0.9rem;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.4);
+  }
+  #label-confirm-btn:hover { opacity: 0.9; }
+  #label-cancel-btn {
+    padding: 8px 20px; background: linear-gradient(180deg,#374151,#1f2937);
+    border: 1px solid #4b5563; border-radius: 3px; color: #94a3b8; font-weight: bold;
+    cursor: pointer; font-size: 0.9rem;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.4);
+  }
+  #label-cancel-btn:hover { opacity: 0.9; }
+</style>
+</head>
+<body>
+
+<!-- トップバー -->
+<div id="topbar">
+  <h1>KakiMoni 親機</h1>
+  <div id="conn-indicator">▶ 接続中...</div>
+  <div id="save-bar">
+    <span>Session: <input id="save-session-input" type="number" min="1" max="99" value="1" title="Session番号を直接入力してEnter"></span>
+    <span>Q: <input id="save-counter-input" type="number" min="0" max="9999" value="0" title="Q番号を直接入力してEnter"></span>
+    <span id="judge-invert-badge" class="off" title="判定時にパレットの色を反転">反転OFF</span>
+  </div>
+  <div style="font-size:0.85rem; color:#6b7280;" id="host-url"></div>
+</div>
+<div id="save-toast"></div>
+
+<!-- 全体コントロール -->
+<div id="global-ctrl">
+  <!-- 左寄せ -->
+  <div class="ctrl-left">
+    <div id="go-group">
+      <span id="selected-badge"></span>
+      <button class="g-btn btn-open" id="g-go">GO</button>
+      <button class="g-btn" id="g-select-all" style="background:linear-gradient(180deg,#1e3a5f 0%,#0f2240 100%);color:#93c5fd;border:1px solid #3b82f6">全選択</button>
+      <button class="g-btn" id="g-deselect-all" style="background:linear-gradient(180deg,#1e3a5f 0%,#0f2240 100%);color:#93c5fd;border:1px solid #3b82f6">全解除</button>
+      <button class="g-btn btn-correct" id="g-judge">判定GO</button>
+      <div class="ctrl-right-sep"></div>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <select id="judge-correct-sel" title="正解画像" style="background:#1e2a3a;color:#f87171;border:1px solid #dc2626;border-radius:3px;padding:3px 6px;font-size:0.78rem;height:28px;cursor:pointer;max-width:110px;"><option value="">移動なし</option></select>
+        <select id="judge-incorrect-sel" title="不正解画像" style="background:#1e2a3a;color:#93c5fd;border:1px solid #3b82f6;border-radius:3px;padding:3px 6px;font-size:0.78rem;height:28px;cursor:pointer;max-width:110px;"><option value="">移動なし</option></select>
+      </div>
+    </div>
+    <button class="g-btn" id="g-judge-clear" style="background:linear-gradient(180deg,#1e3a5f 0%,#0f2240 100%);color:#93c5fd;border:1px solid #3b82f6">判定解除</button>
+    <div class="ctrl-right-sep"></div>
+    <div id="choice-group" style="display:flex;align-items:center;gap:12px">
+      <select id="choice-select" title="選択肢画像" style="background:#1e2a3a;color:#e2e8f0;border:1px solid #3b82f6;border-radius:6px;padding:4px 8px;font-size:0.8rem;height:32px;cursor:pointer">
+        <option value="">&#x2015;なし&#x2015;</option>
+      </select>
+      <button class="g-btn" id="btn-choice-send" style="background:linear-gradient(180deg,#1e3a5f 0%,#0f2240 100%);color:#93c5fd;border:1px solid #3b82f6">選択肢送信</button>
+    </div>
+  </div>
+  <!-- 右寄せ -->
+  <div class="ctrl-right">
+    <button class="g-btn" id="btn-settings-open" style="background:linear-gradient(180deg,#1e3a5f 0%,#0f2240 100%);color:#93c5fd;border:1px solid #3b82f6">⚙️ 設定</button>
+    <div class="ctrl-right-sep"></div>
+    <button class="g-btn btn-clear" id="g-clear-all">全クリア</button>
+    <button class="g-btn btn-unlock" id="g-lock-toggle">全ロック</button>
+  </div>
+  <input type="file" id="roster-file-input" accept=".txt">
+</div>
+
+<!-- 席グリッド -->
+<div id="seats-grid">
+</div>
+
+<!-- 設定モーダル -->
+<div id="settings-modal-overlay">
+  <div id="settings-panel">
+    <div id="settings-panel-header">
+      <span>⚙️ システム設定</span>
+      <button id="settings-modal-close">✕</button>
+    </div>
+    <!-- タブ切り替え -->
+    <div id="settings-tabs">
+      <button class="settings-tab-btn active" data-tab="tab-general">一般</button>
+      <button class="settings-tab-btn" data-tab="tab-label">🏷 ラベル</button>
+      <button class="settings-tab-btn" data-tab="tab-layout">📺 レイアウト</button>
+      <button class="settings-tab-btn" data-tab="tab-roster">📋 名簿</button>
+    </div>
+    <!-- 一般タブ -->
+    <div id="tab-general" class="settings-tab-pane active">
+      <div class="settings-row">
+        <input type="checkbox" id="chk-judge-color-mode">
+        <div>
+          <label for="chk-judge-color-mode">判定時にパレットの色を反転</label>
+          <div class="settings-desc">判定GOでfill型判定画像が表示された際、パレットの色を反転（色の補色）して再描画します。子機・親機・レイアウト全画面に適用。</div>
+        </div>
+      </div>
+      <div class="settings-row" style="margin-top:12px;align-items:center;gap:12px;flex-wrap:wrap">
+        <label style="font-size:0.85rem;white-space:nowrap">🔒 ロック暗転濃度</label>
+        <input type="range" id="lock-darkness-slider" min="0" max="100" value="65" step="1"
+          style="flex:1;min-width:120px;accent-color:#7c3aed">
+        <span id="lock-darkness-value" style="font-size:0.85rem;color:#fbbf24;min-width:36px;text-align:right">65%</span>
+        <div class="settings-desc" style="width:100%;margin-top:2px">子機で「決定」を押すか、親機からロックした時の画面の暗転濃度です。全子機・モバイルに適用。</div>
+      </div>
+      <div class="settings-row" style="margin-top:12px;align-items:center;gap:12px">
+        <label for="ctrl-bg-color" style="font-size:0.85rem;white-space:nowrap">🎨 ページ背景色</label>
+        <input type="color" id="ctrl-bg-color" value="#1a1a1a" style="width:44px;height:32px;border:1px solid #374151;border-radius:4px;background:none;cursor:pointer;padding:2px">
+        <button id="ctrl-bg-reset" style="font-size:0.75rem;padding:4px 10px;background:#1e293b;border:1px solid #374151;color:#94a3b8;border-radius:3px;cursor:pointer">リセット</button>
+      </div>
+    </div>
+    <!-- ラベルタブ -->
+    <div id="tab-label" class="settings-tab-pane">
+      <div class="label-section">
+        <div class="lbl-toggle-row">
+          <input type="checkbox" id="lbl-enabled" checked>
+          <label for="lbl-enabled">ラベルを表示する</label>
+        </div>
+        <div style="font-size:0.72rem;color:#6b7280;margin-top:6px">表示テキストは「名簿」タブで読み込んだIDごとの名前です</div>
+      </div>
+      <div class="label-section">
+        <div class="label-section-title">🔤 フォント</div>
+        <div class="label-row"><label>サイズ</label><input type="range" id="lbl-fontsize" min="8" max="120" value="70"><span class="lbl-val" id="lbl-fontsize-val">70px</span></div>
+        <div class="label-row"><label>種類</label><select id="lbl-fontfamily"><option value="sans-serif">ゴシック (sans-serif)</option><option value="serif">明朝 (serif)</option><option value="monospace">等幅 (monospace)</option><option value="'Noto Sans JP', sans-serif">Noto Sans JP</option></select></div>
+        <div class="label-row"><label>スタイル</label><button class="lbl-style-btn" id="lbl-bold"><b>B</b></button><button class="lbl-style-btn" id="lbl-italic"><i>I</i></button></div>
+      </div>
+      <div class="label-section">
+        <div class="label-section-title">📍 位置・揃え</div>
+        <div class="label-row"><label>X</label><input type="range" id="lbl-x" min="0" max="100" value="50"><span class="lbl-val" id="lbl-x-val">50%</span></div>
+        <div class="label-row"><label>Y</label><input type="range" id="lbl-y" min="0" max="100" value="86"><span class="lbl-val" id="lbl-y-val">86%</span></div>
+        <div class="label-row"><label>揃え</label><div style="display:flex;gap:4px"><button class="lbl-align-btn" data-align="left">左</button><button class="lbl-align-btn active" data-align="center">中央</button><button class="lbl-align-btn" data-align="right">右</button></div></div>
+      </div>
+      <div class="label-section">
+        <div class="label-section-title">🎨 色</div>
+        <div class="label-row"><label>文字色</label><input type="color" id="lbl-color" value="#000000"></div>
+        <div class="label-row"><label>背景色</label><input type="color" id="lbl-bgcolor" value="#000000"><input type="range" id="lbl-bgopacity" min="0" max="100" value="0" style="flex:1"><span class="lbl-val" id="lbl-bgopacity-val">0%</span></div>
+        <div class="label-row"><label>背景余白</label><input type="range" id="lbl-bgpadding" min="0" max="40" value="8"><span class="lbl-val" id="lbl-bgpadding-val">8px</span></div>
+      </div>
+      <div class="label-section">
+        <div class="label-section-title">✨ 影</div>
+        <div class="label-row"><label>影</label><input type="checkbox" id="lbl-shadow"><span style="font-size:0.75rem;color:#94a3b8">影を表示する</span></div>
+        <div id="lbl-shadow-opts">
+          <div class="label-row"><label>影の色</label><input type="color" id="lbl-shadowcolor" value="#000000"></div>
+          <div class="label-row"><label>ぼかし</label><input type="range" id="lbl-shadowblur" min="0" max="30" value="4"><span class="lbl-val" id="lbl-shadowblur-val">4px</span></div>
+          <div class="label-row"><label>Xオフセット</label><input type="range" id="lbl-shadowx" min="-20" max="20" value="0"><span class="lbl-val" id="lbl-shadowx-val">0px</span></div>
+          <div class="label-row"><label>Yオフセット</label><input type="range" id="lbl-shadowy" min="-20" max="20" value="2"><span class="lbl-val" id="lbl-shadowy-val">2px</span></div>
+        </div>
+      </div>
+      <div id="label-modal-actions"><button id="label-cancel-btn">キャンセル</button><button id="label-confirm-btn">💾 保存</button></div>
+    </div>
+    <!-- 名簿タブ -->
+    <div id="tab-roster" class="settings-tab-pane">
+      <div id="roster-tab-area">
+        <div style="font-size:0.8rem;color:#94a3b8;margin-bottom:10px">席番号順（1行1名）のテキストファイルを読み込んで全席に配信します。</div>
+        <button id="btn-roster-load" class="g-btn" style="background:linear-gradient(180deg,#1e3a5f 0%,#0f2240 100%);color:#93c5fd;border:1px solid #3b82f6;width:100%">📂 名簿ファイルを選択して読み込む</button>
+        <div id="roster-hint" style="font-size:0.75rem;color:#6b7280;margin-top:8px">席番号順（1行1名）のテキストファイルを読み込んで全席に配信</div>
+      </div>
+    </div>
+    <!-- レイアウトタブ -->
+    <div id="tab-layout" class="settings-tab-pane">
+      <div id="layout-mode-toggle">
+        <button class="layout-mode-btn active" id="lmode-grid">▦ グリッド</button>
+        <button class="layout-mode-btn" id="lmode-free">❐ フリー</button>
+      </div>
+      <!-- グリッドセクション -->
+      <div id="layout-grid-section">
+        <div id="layout-presets"></div>
+        <div id="layout-editor-grid"></div>
+      </div>
+      <!-- フリーセクション -->
+      <div id="layout-free-section">
+        <div id="free-detail-bar"></div>
+        <div id="free-canvas-wrap"><div id="free-canvas"></div></div>
+        <div id="free-bg-picker">
+          <span id="free-bg-picker-label">🖼️ BG</span>
+          <button id="free-bg-none" class="selected">なし</button>
+          <div id="free-bg-thumbs"></div>
+        </div>
+        <div id="free-cell-inspector">
+          <span id="fci-title">← パネルを選択</span>
+          <div id="fci-inputs">
+            <div id="fci-anchor">
+              <button class="fci-anchor-dot active" data-anchor="tl" title="左上"></button>
+              <button class="fci-anchor-dot" data-anchor="tc" title="上中央"></button>
+              <button class="fci-anchor-dot" data-anchor="tr" title="右上"></button>
+              <button class="fci-anchor-dot" data-anchor="ml" title="左中央"></button>
+              <button class="fci-anchor-dot" data-anchor="mc" title="中心"></button>
+              <button class="fci-anchor-dot" data-anchor="mr" title="右中央"></button>
+              <button class="fci-anchor-dot" data-anchor="bl" title="左下"></button>
+              <button class="fci-anchor-dot" data-anchor="bc" title="下中央"></button>
+              <button class="fci-anchor-dot" data-anchor="br" title="右下"></button>
+            </div>
+            <div class="fci-group"><span class="fci-label">X</span><input type="number" id="fci-x" class="fci-inp" min="-1920" max="3840" step="1"></div>
+            <div class="fci-group"><span class="fci-label">Y</span><input type="number" id="fci-y" class="fci-inp" min="-1080" max="2160" step="1"></div>
+            <div class="fci-group"><span class="fci-label">W</span><input type="number" id="fci-w" class="fci-inp" min="10" max="1920" step="1"></div>
+            <div class="fci-group"><span class="fci-label">H</span><input type="number" id="fci-h" class="fci-inp" min="10" max="1080" step="1"></div>
+            <label id="fci-lock-wrap"><input type="checkbox" id="fci-lock"> 縦横比固定</label>
+          </div>
+        </div>
+        <div id="fci-text-section" class="no-selection">
+          <div style="color:#fbbf24;font-weight:bold;margin-bottom:4px;">📝 テキストオーバーレイ</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:4px;">
+            <div class="fci-group">
+              <span class="fci-label">文字色</span>
+              <input type="color" id="fci-text-color" class="fci-color-inp" value="#ffffff">
+            </div>
+            <div class="fci-group">
+              <span class="fci-label">背景色</span>
+              <input type="color" id="fci-text-bg" class="fci-color-inp" value="#000000">
+              <input type="range" id="fci-text-bg-opacity" min="0" max="100" value="50" style="width:44px;">
+              <span id="fci-text-bg-opacity-val" class="fci-label">50%</span>
+            </div>
+            <div class="fci-group">
+              <span class="fci-label">サイズ</span>
+              <input type="number" id="fci-text-size" class="fci-inp" value="48" min="8" max="400">
+            </div>
+          </div>
+          <div style="display:flex;gap:4px;align-items:center;margin-top:4px;">
+            <span class="fci-label">縦</span>
+            <button class="fci-valign-btn active" data-valign="top">上</button>
+            <button class="fci-valign-btn" data-valign="center">中</button>
+            <button class="fci-valign-btn" data-valign="bottom">下</button>
+            <span class="fci-label" style="margin-left:6px;">横</span>
+            <button class="fci-halign-btn active" data-halign="left">左</button>
+            <button class="fci-halign-btn" data-halign="center">中</button>
+            <button class="fci-halign-btn" data-halign="right">右</button>
+          </div>
+        </div>
+        <div id="add-btns-group">
+          <button id="btn-add-free-cell">＋ パネル追加</button>
+          <button id="btn-add-text-cell">📝 テキスト追加</button>
+        </div>
+        <div id="free-save-area">
+          <div id="free-save-area-title">💾 保存スロット</div>
+          <div id="free-save-slots"></div>
+        </div>
+      </div>
+      <div id="layout-modal-actions">
+        <div style="display:flex;align-items:center;gap:6px;flex:1">
+          <label style="font-size:0.75rem;color:#94a3b8;white-space:nowrap">📺 送信先グループ</label>
+          <input type="text" id="layout-target-group" value="default"
+            placeholder="default"
+            style="flex:1;background:#1e293b;border:1px solid #374151;color:#e2e8f0;
+                   padding:4px 8px;border-radius:3px;font-size:0.8rem;outline:none">
+        </div>
+        <button id="layout-reset-btn">クリア</button>
+        <button id="layout-apply-btn">📺 送信</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- カスタム確認ダイアログ -->
+<div id="host-confirm-overlay">
+  <div id="host-confirm-box">
+    <div id="host-confirm-msg"></div>
+    <div id="host-confirm-btns">
+      <button id="host-confirm-yes">はい</button>
+      <button id="host-confirm-no">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// ====================================================
+// 状態
+// ====================================================
+const seats = new Map();
+const currentStrokes = new Map();
+
+let socket = null;
+let hostLabelConfig = null;
+let goActive     = false; // GOボタン押下状態
+let judgeActive  = false; // 判定GOボタン押下状態
+
+function setGoActive(val) {
+  goActive = val;
+  document.getElementById('g-go').classList.toggle('active', val);
+}
+function setJudgeActive(val) {
+  judgeActive = val;
+  document.getElementById('g-judge').classList.toggle('active', val);
+}
+
+// ファイル読込 → 即時配信
+document.getElementById('btn-roster-load').addEventListener('click', () => {
+  document.getElementById('roster-file-input').click();
+});
+document.getElementById('roster-file-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const lines = ev.target.result.split(/\r?\n/).map(l => l.trim()).filter((_, i) => i < 10);
+    const names = {};
+    for (let i = 1; i <= 10; i++) names[String(i)] = lines[i - 1] || '';
+    socket.emit('host-set-names', names);
+    const loaded = lines.filter(l => l).length;
+    document.getElementById('roster-hint').textContent = `✅ ${loaded}名を読み込んで配信しました`;
+    setTimeout(() => {
+      document.getElementById('roster-hint').textContent = '席番号順（1行1名）のテキストファイルを読み込んで全席に配信';
+    }, 3000);
+    e.target.value = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+});
+
+// ====================================================
+// Socket 接続
+// ====================================================
+function connect() {
+  socket = io();
+
+  socket.on('connect', () => {
+    document.getElementById('conn-indicator').textContent = '● 接続済み';
+    document.getElementById('conn-indicator').className = 'ok';
+    socket.emit('register-host');
+  });
+
+  socket.on('disconnect', () => {
+    document.getElementById('conn-indicator').textContent = '× 切断';
+    document.getElementById('conn-indicator').className = '';
+  });
+
+  // フル状態受信（初回 or 同期）
+  socket.on('full-state', (state) => {
+    for (const s of state.seats) updateSeat(s);
+    if (state.labelConfig) { hostLabelConfig = state.labelConfig; _applyConfigToLabelUI(state.labelConfig); applyAllHostLabels(); }
+    // 選択肢画像を復元
+    if (state.choiceImageUrl) applyChoiceImage(state.choiceImageUrl);
+    else clearChoiceImage();
+    // 判定色反転モードを復元
+    if (typeof state.judgeColorMode !== 'undefined') {
+      judgeColorMode = !!state.judgeColorMode;
+      const chk = document.getElementById('chk-judge-color-mode');
+      if (chk) chk.checked = judgeColorMode;
+      updateJudgeInvertBadge(judgeColorMode);
+    }
+    // ロック暗転濃度を復元
+    if (typeof state.lockDarkness !== 'undefined') {
+      applyLockDarknessUI(state.lockDarkness);
+    }
+  });
+
+  // リアルタイム描画（指を魚いたタイミング）
+  socket.on('stroke-start', ({ seatId, stroke }) => {
+    currentStrokes.set(String(seatId), stroke);
+    const seat = seats.get(String(seatId));
+    if (!seat) return;
+    drawStrokeOnCanvas(seat.canvas, seat.ctx, stroke, judgeColorMode && seat.judging);
+  });
+
+  socket.on('stroke-point', ({ seatId, point }) => {
+    const id = String(seatId);
+    const stroke = currentStrokes.get(id);
+    if (!stroke) return;
+    stroke.points.push(point);
+    const seat = seats.get(id);
+    if (!seat) return;
+    drawStrokeSegment(seat.canvas, seat.ctx, stroke, judgeColorMode && seat.judging);
+  });
+
+  socket.on('stroke-end', ({ seatId }) => {
+    const id = String(seatId);
+    const stroke = currentStrokes.get(id);
+    if (!stroke) return;
+    const seat = seats.get(id);
+    if (seat) seat.strokes.push(stroke);
+    currentStrokes.delete(id);
+  });
+
+  // キャンバスクリア
+  socket.on('canvas-cleared', ({ seatId }) => {
+    const seat = seats.get(String(seatId));
+    if (!seat) return;
+    seat.strokes = [];
+    redrawCanvas(seat);
+    clearJudgeOverlay(String(seatId));
+  });
+
+  // 描画のみクリア（判定は残す）
+  socket.on('canvas-cleared-strokes', ({ seatId }) => {
+    const seat = seats.get(String(seatId));
+    if (!seat) return;
+    seat.strokes = [];
+    redrawCanvas(seat);
+  });
+  socket.on('seat-strokes-updated', ({ seatId, strokes }) => {
+    const seat = seats.get(String(seatId));
+    if (!seat) return;
+    seat.strokes = strokes;
+    redrawCanvas(seat);
+  });
+
+  // ロック
+  socket.on('seat-locked',  ({ seatId }) => { setSeatLocked(seatId, true); });
+  socket.on('seat-unlocked',({ seatId }) => { setSeatLocked(seatId, false); });
+
+  // 判定結果オーバーレイ
+  function clearJudgeOverlay(seatId) {
+    const ovl  = document.getElementById(`rovl-${seatId}`);
+    const rimg = document.getElementById(`rimg-${seatId}`);
+    if (!ovl || !rimg) return;
+    ovl.classList.remove('show');
+    rimg.src = '';
+    const seat = seats.get(String(seatId));
+    if (seat) { seat.judging = false; seat.fillImageUrl = ''; updateBgLayer(String(seatId)); redrawCanvas(seat); }
+  }
+  socket.on('judge-result', ({ seatId, imageUrl }) => {
+    const ovl  = document.getElementById(`rovl-${seatId}`);
+    const rimg = document.getElementById(`rimg-${seatId}`);
+    if (!ovl || !rimg) return;
+    const isFill = /fill/i.test(imageUrl.split('/').pop());
+    const seat = seats.get(String(seatId));
+    if (isFill) {
+      ovl.classList.remove('show');
+      rimg.src = '';
+      if (seat) { seat.judging = true; seat.fillImageUrl = imageUrl; updateBgLayer(String(seatId)); redrawCanvas(seat); }
+    } else {
+      if (seat) { seat.judging = false; seat.fillImageUrl = ''; updateBgLayer(String(seatId)); redrawCanvas(seat); }
+      rimg.src = imageUrl;
+      rimg.className = '';
+      ovl.classList.add('show');
+    }
+    // 判定ボタンを淨み状態に
+    const jb = document.getElementById(`judgebtn-${seatId}`);
+    if (jb) jb.classList.add('judged');
+    // 判定GO保存待機中ならキャプチャして保存
+    if (pendingJudgeSaves.has(String(seatId))) {
+      pendingJudgeSaves.delete(String(seatId));
+      captureAndSave(String(seatId), 'JUDGE', saveSession, saveCounter, imageUrl);
+    }
+  });
+  // 判定オーバーレイの全除去（判定解除ボタンから）
+  socket.on('clear-overlay', (data) => {
+    if (data?.seatId) {
+      clearJudgeOverlay(String(data.seatId));
+    } else {
+      for (const [id] of seats) clearJudgeOverlay(String(id));
+    }
+  });
+  socket.on('all-locked',   () => {
+    for (const id of seats.keys()) setSeatLocked(id, true);
+    updateLockToggleBtn(true);
+  });
+  socket.on('all-unlocked', () => {
+    for (const id of seats.keys()) setSeatLocked(id, false);
+    updateLockToggleBtn(false);
+  });
+  socket.on('show-choice', ({ imageUrl }) => {
+    if (imageUrl) applyChoiceImage(imageUrl); else clearChoiceImage();
+  });
+  socket.on('clear-choice', () => { clearChoiceImage(); });
+  socket.on('judge-color-mode', ({ enabled }) => {
+    judgeColorMode = enabled;
+    const chk = document.getElementById('chk-judge-color-mode');
+    if (chk) chk.checked = enabled;
+    updateJudgeInvertBadge(enabled);
+    for (const seat of seats.values()) redrawCanvas(seat);
+  });
+
+}
+
+// ====================================================
+// 席管理
+// ====================================================
+function updateSeat(seatData) {
+  const id = String(seatData.seatId);
+  if (!seats.has(id)) {
+    createSeatCard(id, seatData);
+  }
+  const seat = seats.get(id);
+  seat.name      = seatData.name;
+  seat.connected = seatData.connected;
+  seat.locked    = seatData.locked;
+
+  // 背景画像URLが変わった場合はwrapのCSSに適用
+  const newBgUrl = seatData.bgImageUrl || '';
+  if (newBgUrl !== seat.bgImageUrl) {
+    seat.bgImageUrl = newBgUrl;
+    seat.bgImage = null;
+    updateBgLayer(String(id));
+  }
+
+  // ストローク初期化
+  if (seatData.strokes && seatData.strokes.length > 0) {
+    seat.strokes = [...seatData.strokes];
+    redrawCanvas(seat);
+  }
+
+  refreshSeatCard(id);
+  removeEmptyMessage();
+}
+
+function createSeatCard(id, seatData) {
+  const grid = document.getElementById('seats-grid');
+
+  const card = document.createElement('div');
+  card.className = 'seat-card';
+  card.id = `card-${id}`;
+
+  card.innerHTML = `
+    <div class="seat-header">
+      <div class="seat-header-info">
+        <div class="seat-num" id="num-${id}">${id}</div>
+        <div class="seat-name" id="name-${id}">${seatData.name || '未接続'}</div>
+      </div>
+      <div class="seat-header-btns">
+        <div class="seat-hbtn s-select-zone" id="selbtn-${id}" onclick="toggleSelect('${id}')">選択</div>
+      </div>
+    </div>
+    <div class="seat-canvas-wrap" id="cwrap-${id}">
+      <div class="seat-choice-layer" id="clayer-${id}"><img id="cimg-${id}" src="" alt=""></div>
+      <canvas class="seat-canvas" id="canvas-${id}"></canvas>
+      <div class="seat-name-label" id="hlabel-${id}"></div>
+      <div class="seat-placeholder" id="placeholder-${id}">待機中</div>
+      <div class="seat-result-overlay" id="rovl-${id}"><img id="rimg-${id}" src="" alt=""></div>
+      <div class="seat-bg-layer" id="bglayer-${id}"></div>
+    </div>
+    <div class="seat-ctrl">
+      <div class="seat-hbtn s-lock-zone" id="lockbtn-${id}" onclick="toggleLock('${id}')">ロック</div>
+      <button class="s-judge-kind seat-hbtn" id="judgebtn-${id}" onclick="toggleJudgeKind('${id}')">正解</button>
+    </div>
+    </div>
+  `;
+
+  grid.appendChild(card);
+
+  const canvas = document.getElementById(`canvas-${id}`);
+  const ctx    = canvas.getContext('2d');
+
+  // キャンバスサイズ設定
+  function resizeCanvas() {
+    const wrap = document.getElementById(`cwrap-${id}`);
+    const r = window.devicePixelRatio || 1;
+    const w = wrap.clientWidth;
+    const h = wrap.clientHeight;
+    canvas.width  = Math.floor(w * r);
+    canvas.height = Math.floor(h * r);
+    canvas.style.width  = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.scale(r, r);
+    const seat = seats.get(id);
+    if (seat) redrawCanvas(seat);
+  }
+  // ダブルクリック / ダブルタップでクリア
+  const cwrap = document.getElementById(`cwrap-${id}`);
+  cwrap.addEventListener('dblclick', () => clearSeat(id));
+  let lastTap = 0;
+  cwrap.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTap < 300) { e.preventDefault(); clearSeat(id); }
+    lastTap = now;
+  }, { passive: false });
+
+  setTimeout(resizeCanvas, 50);
+  window.addEventListener('resize', resizeCanvas);
+
+  seats.set(id, {
+    name: seatData.name || '',
+    connected: false,
+    locked: false,
+    strokes: [],
+    bgImageUrl: '',
+    bgImage: null,
+    fillImageUrl: '',
+    judging: false,
+    card, canvas, ctx,
+  });
+}
+
+function applyHostSeatLabel(id) {
+  const el = document.getElementById(`hlabel-${id}`);
+  if (!el) return;
+  const seat = seats.get(String(id));
+  const name = seat ? (seat.name || '') : '';
+  if (!hostLabelConfig || !hostLabelConfig.enabled || !name || name === '未接続') {
+    el.style.display = 'none'; return;
+  }
+  const wrap = document.getElementById(`cwrap-${id}`);
+  const wrapH = wrap ? (wrap.offsetHeight || 100) : 100;
+  const scale = Math.max(0.05, Math.min(1, wrapH / (window.screen.height || 1080)));
+  el.textContent = name;
+  el.style.display    = 'block';
+  el.style.left       = hostLabelConfig.x + '%';
+  el.style.top        = hostLabelConfig.y + '%';
+  const align = hostLabelConfig.textAlign || 'left';
+  el.style.transform  = align === 'center' ? 'translateX(-50%)' : align === 'right' ? 'translateX(-100%)' : 'none';
+  el.style.textAlign  = align;
+  el.style.fontSize   = Math.round(hostLabelConfig.fontSize * scale) + 'px';
+  el.style.fontFamily = hostLabelConfig.fontFamily;
+  el.style.fontWeight = hostLabelConfig.bold   ? 'bold'   : 'normal';
+  el.style.fontStyle  = hostLabelConfig.italic ? 'italic' : 'normal';
+  el.style.color      = hostLabelConfig.color;
+  const bg = hostLabelConfig.bgColor || 'rgba(0,0,0,0)';
+  el.style.backgroundColor = bg;
+  el.style.padding    = bg.endsWith(',0)') ? '0' : Math.round(hostLabelConfig.bgPadding * scale) + 'px';
+  if (hostLabelConfig.shadowEnabled) {
+    const { shadowOffsetX: ox, shadowOffsetY: oy, shadowBlur: bl, shadowColor: sc } = hostLabelConfig;
+    el.style.textShadow = `${ox}px ${oy}px ${bl}px ${sc}`;
+  } else {
+    el.style.textShadow = '';
+  }
+}
+function applyAllHostLabels() {
+  for (const [id] of seats) applyHostSeatLabel(id);
+}
+
+function refreshSeatCard(id) {
+  const seat = seats.get(id);
+  if (!seat) return;
+
+  const name  = document.getElementById(`name-${id}`);
+  const card  = document.getElementById(`card-${id}`);
+
+  if (name)  name.textContent = seat.name || '未接続';
+  applyHostSeatLabel(id);
+
+  const numEl = document.getElementById(`num-${id}`);
+  if (numEl) numEl.classList.toggle('connected-num', seat.connected);
+
+  let cardClass = 'seat-card';
+  if (seat.connected)          cardClass += ' connected';
+  if (seat.locked)             cardClass += ' locked';
+  if (selectedSeats.has(id))   cardClass += ' selected';
+  if (card) card.className = cardClass;
+
+  const lockBtn = document.getElementById(`lockbtn-${id}`);
+  if (lockBtn) {
+    if (seat.locked) {
+      lockBtn.textContent = 'ロック中';
+      lockBtn.title = 'ロック中（タップで解除）';
+      lockBtn.classList.add('locked');
+    } else {
+      lockBtn.textContent = 'ロック';
+      lockBtn.title = 'タップでロック解除';
+      lockBtn.classList.remove('locked');
+    }
+  }
+}
+
+function setSeatLocked(id, locked) {
+  const seat = seats.get(String(id));
+  if (!seat) return;
+  seat.locked = locked;
+  refreshSeatCard(String(id));
+}
+
+function removeEmptyMessage() {
+  // 常時10席表示のため不要（何もしない）
+}
+
+// ====================================================
+// Canvas 描画ヘルパー
+// ====================================================
+function invertColor(hex) {
+  if (!hex || hex[0] !== '#' || hex.length !== 7) return hex;
+  const r = 255 - parseInt(hex.slice(1, 3), 16);
+  const g = 255 - parseInt(hex.slice(3, 5), 16);
+  const b = 255 - parseInt(hex.slice(5, 7), 16);
+  return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+function drawStrokeSegment(canvas, ctx, stroke, inv = false) {
+  const pts = stroke.points;
+  if (pts.length < 2) return;
+  const dispW = canvas.width  / (window.devicePixelRatio || 1);
+  const dispH = canvas.height / (window.devicePixelRatio || 1);
+  const scaleX = stroke.srcW ? dispW / stroke.srcW : 1;
+  const scaleY = stroke.srcH ? dispH / stroke.srcH : 1;
+  ctx.save();
+  if (stroke.tool === 'eraser') {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.strokeStyle = 'rgba(0,0,0,1)';
+  } else {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = inv ? invertColor(stroke.color) : stroke.color;
+  }
+  ctx.lineWidth = Math.max(1, stroke.size * Math.min(scaleX, scaleY));
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  if (pts.length === 2) {
+    ctx.moveTo(pts[0].x * scaleX, pts[0].y * scaleY);
+    ctx.lineTo(pts[1].x * scaleX, pts[1].y * scaleY);
+  } else {
+    const pprev = pts[pts.length - 3];
+    const prev  = pts[pts.length - 2];
+    const curr  = pts[pts.length - 1];
+    ctx.moveTo((pprev.x + prev.x) / 2 * scaleX, (pprev.y + prev.y) / 2 * scaleY);
+    ctx.quadraticCurveTo(prev.x * scaleX, prev.y * scaleY,
+      (prev.x + curr.x) / 2 * scaleX, (prev.y + curr.y) / 2 * scaleY);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawStrokeOnCanvas(canvas, ctx, stroke, inv = false) {
+  if (!stroke.points || stroke.points.length < 1) return;
+
+  const dispW = canvas.width  / (window.devicePixelRatio || 1);
+  const dispH = canvas.height / (window.devicePixelRatio || 1);
+  const scaleX = stroke.srcW ? dispW / stroke.srcW : 1;
+  const scaleY = stroke.srcH ? dispH / stroke.srcH : 1;
+
+  ctx.save();
+  if (stroke.tool === 'eraser') {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.strokeStyle = 'rgba(0,0,0,1)';
+  } else {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = inv ? invertColor(stroke.color) : stroke.color;
+  }
+  ctx.lineWidth = Math.max(1, stroke.size * Math.min(scaleX, scaleY));
+  ctx.lineCap   = 'round';
+  ctx.lineJoin  = 'round';
+
+  ctx.beginPath();
+  ctx.moveTo(stroke.points[0].x * scaleX, stroke.points[0].y * scaleY);
+  for (let i = 1; i < stroke.points.length; i++) {
+    const prev = stroke.points[i - 1];
+    const curr = stroke.points[i];
+    ctx.quadraticCurveTo(
+      prev.x * scaleX, prev.y * scaleY,
+      (prev.x + curr.x) / 2 * scaleX, (prev.y + curr.y) / 2 * scaleY
+    );
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function clearCanvas(canvas, ctx) {
+  const w = canvas.width  / (window.devicePixelRatio || 1);
+  const h = canvas.height / (window.devicePixelRatio || 1);
+  ctx.clearRect(0, 0, w, h);
+}
+
+function updateBgLayer(seatId) {
+  const seat = seats.get(String(seatId));
+  if (!seat) return;
+  const bgLayer = document.getElementById(`bglayer-${seatId}`);
+  const cwrap   = document.getElementById(`cwrap-${seatId}`);
+  // BG は seat-bg-layer (z11) へ
+  if (bgLayer) {
+    bgLayer.style.backgroundImage = seat.bgImageUrl ? `url('${seat.bgImageUrl}')` : '';
+  }
+  // fill は seat-canvas-wrap の background (z0) へ — canvas(z9) や bg-layer(z11) に隠されない
+  if (cwrap) {
+    if (seat.fillImageUrl) {
+      cwrap.style.backgroundImage = `url('${seat.fillImageUrl}')`;
+      cwrap.style.backgroundSize  = '100% 100%';
+    } else {
+      cwrap.style.backgroundImage = '';
+      cwrap.style.backgroundSize  = '';
+    }
+  }
+}
+
+function redrawCanvas(seat) {
+  clearCanvas(seat.canvas, seat.ctx);
+  const inv = judgeColorMode && seat.judging;
+  for (const stroke of seat.strokes) {
+    drawStrokeOnCanvas(seat.canvas, seat.ctx, stroke, inv);
+  }
+}
+
+// ====================================================
+// 席選択
+// ====================================================
+const selectedSeats = new Set();
+
+function updateSelectionBadge() {
+  const badge = document.getElementById('selected-badge');
+  if (!badge) return;
+  if (selectedSeats.size > 0) {
+    badge.textContent = `選択中: ${selectedSeats.size}席`;
+    badge.classList.add('visible');
+  } else {
+    badge.classList.remove('visible');
+  }
+}
+
+function toggleSelect(id) {
+  const btn  = document.getElementById(`selbtn-${id}`);
+  const card = document.getElementById(`card-${id}`);
+  if (!btn) return;
+  if (selectedSeats.has(id)) {
+    selectedSeats.delete(id);
+    btn.classList.remove('selected');
+    btn.textContent = '選択';
+    if (card) card.classList.remove('selected');
+  } else {
+    selectedSeats.add(id);
+    btn.classList.add('selected');
+    btn.textContent = '選択中';
+    if (card) card.classList.add('selected');
+  }
+  updateSelectionBadge();
+}
+
+function selectAllConnected() {
+  for (const [id, seat] of seats) {
+    if (!seat.connected) continue;
+    if (!selectedSeats.has(id)) toggleSelect(id);
+  }
+}
+function deselectAll() {
+  for (const id of [...selectedSeats]) toggleSelect(id);
+}
+
+// ====================================================
+// 選択肢画像
+// ====================================================
+let currentChoiceImageUrl = '';
+function applyChoiceImage(url) {
+  currentChoiceImageUrl = url || '';
+  for (const [id] of seats) {
+    const layer = document.getElementById(`clayer-${id}`);
+    const img   = document.getElementById(`cimg-${id}`);
+    if (!layer || !img) continue;
+    img.src = url;
+    layer.classList.add('show');
+  }
+}
+function clearChoiceImage() {
+  currentChoiceImageUrl = '';
+  for (const [id] of seats) {
+    const layer = document.getElementById(`clayer-${id}`);
+    const img   = document.getElementById(`cimg-${id}`);
+    if (!layer || !img) continue;
+    layer.classList.remove('show');
+    img.src = '';
+  }
+}
+// choice-images を取得してプルダウンに反映
+fetch('/api/choice-images').then(r => r.json()).then(list => {
+  const sel = document.getElementById('choice-select');
+  for (const url of list) {
+    const opt = document.createElement('option');
+    opt.value = url;
+    opt.textContent = url.split('/').pop();
+    sel.appendChild(opt);
+  }
+}).catch(() => {});
+
+document.getElementById('btn-choice-send').addEventListener('click', () => {
+  const url = document.getElementById('choice-select').value;
+  if (!url) {
+    socket.emit('host-clear-choice');
+    clearChoiceImage();
+  } else {
+    socket.emit('host-show-choice', { imageUrl: url });
+    applyChoiceImage(url);
+  }
+});
+
+
+// 正解/不正解トグル（デフォルト: 正解）
+const judgementKind = new Map(); // id -> 'correct' | 'incorrect'
+function getJudgeKind(id) { return judgementKind.get(id) || 'correct'; }
+function toggleJudgeKind(id) {
+  const next = getJudgeKind(id) === 'correct' ? 'incorrect' : 'correct';
+  judgementKind.set(id, next);
+  const btn = document.getElementById(`judgebtn-${id}`);
+  if (!btn) return;
+  if (next === 'correct') {
+    btn.textContent = '正解';
+    btn.classList.remove('incorrect');
+  } else {
+    btn.textContent = '不正解';
+    btn.classList.add('incorrect');
+  }
+}
+
+// ====================================================
+// 席個別コントロール
+// ====================================================
+function toggleLock(id) {
+  const seat = seats.get(id);
+  if (!seat) return;
+  if (seat.locked) socket.emit('host-unlock', { seatId: id });
+  else socket.emit('host-lock', { seatId: id });
+}
+function clearSeat(id) {
+  socket.emit('host-clear', { seatId: id });
+}
+
+// ====================================================
+// セーブ機能
+// ====================================================
+let saveSession = 1, saveCounter = 0;
+const pendingJudgeSaves = new Set(); // seatId のセット
+
+function updateSaveUI() {
+  document.getElementById('save-session-input').value = String(saveSession);
+  document.getElementById('save-counter-input').value = String(saveCounter);
+}
+
+let saveToastTimer = null;
+function showSaveToast(filename) {
+  const el = document.getElementById('save-toast');
+  el.textContent = '✅ 保存: ' + filename;
+  el.classList.add('show');
+  clearTimeout(saveToastTimer);
+  saveToastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+function loadImageToCanvas(ctx, url, x, y, w, h) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => { ctx.drawImage(img, x, y, w, h); resolve(); };
+    img.onerror = resolve;
+    img.src = url;
+  });
+}
+
+async function captureAndSave(seatId, type, session, counter, judgeImageUrl = null) {
+  const seat = seats.get(String(seatId));
+  if (!seat) return;
+
+  const W = 1920, H = 1080;
+  const offscreen = document.createElement('canvas');
+  offscreen.width = W; offscreen.height = H;
+  const octx = offscreen.getContext('2d');
+
+  // fill型判定画像があれば最初に描画（BG・ストロークの下）
+  const isFillJudge = judgeImageUrl && /fill/i.test(judgeImageUrl.split('/').pop());
+
+  // 白背景
+  octx.fillStyle = '#ffffff';
+  octx.fillRect(0, 0, W, H);
+
+  // fill型の判定 → 白背景の直上・BG画像の下
+  if (type === 'JUDGE' && isFillJudge) await loadImageToCanvas(octx, judgeImageUrl, 0, 0, W, H);
+
+  // BG画像
+  if (seat.bgImageUrl) await loadImageToCanvas(octx, seat.bgImageUrl, 0, 0, W, H);
+
+  // 描画ストロークをフル解像度で直接再描画（seat.canvasの低解像度upscaleを避ける）
+  const saveInv = type !== 'GO' && judgeColorMode && seat.judging;
+  for (const stroke of (seat.strokes || [])) {
+    if (!stroke.points || stroke.points.length < 1) continue;
+    const scaleX = stroke.srcW ? W / stroke.srcW : 1;
+    const scaleY = stroke.srcH ? H / stroke.srcH : 1;
+    octx.save();
+    if (stroke.tool === 'eraser') {
+      octx.globalCompositeOperation = 'destination-out';
+      octx.strokeStyle = 'rgba(0,0,0,1)';
+    } else {
+      octx.globalCompositeOperation = 'source-over';
+      octx.strokeStyle = saveInv ? invertColor(stroke.color) : stroke.color;
+    }
+    octx.lineWidth = Math.max(1, stroke.size * Math.min(scaleX, scaleY));
+    octx.lineCap   = 'round';
+    octx.lineJoin  = 'round';
+    octx.beginPath();
+    octx.moveTo(stroke.points[0].x * scaleX, stroke.points[0].y * scaleY);
+    for (let i = 1; i < stroke.points.length; i++) {
+      const prev = stroke.points[i - 1];
+      const curr = stroke.points[i];
+      octx.quadraticCurveTo(
+        prev.x * scaleX, prev.y * scaleY,
+        (prev.x + curr.x) / 2 * scaleX, (prev.y + curr.y) / 2 * scaleY
+      );
+    }
+    octx.stroke();
+    octx.restore();
+  }
+
+  // ラベル描画
+  if (hostLabelConfig && hostLabelConfig.enabled) {
+    const labelName = seat ? (seat.name || '') : '';
+    if (labelName && labelName !== '未接続') {
+      const lx = hostLabelConfig.x / 100 * W;
+      const ly = hostLabelConfig.y / 100 * H;
+      const fs = hostLabelConfig.fontSize;
+      const fontStr = `${hostLabelConfig.italic ? 'italic ' : ''}${hostLabelConfig.bold ? 'bold ' : ''}${fs}px ${hostLabelConfig.fontFamily || 'sans-serif'}`;
+      octx.save();
+      octx.font = fontStr;
+      octx.textBaseline = 'top';
+      octx.textAlign = hostLabelConfig.textAlign || 'left';
+      const bg = hostLabelConfig.bgColor || 'rgba(0,0,0,0)';
+      const pad = hostLabelConfig.bgPadding || 0;
+      if (pad > 0 && !bg.endsWith(',0)')) {
+        const tw = octx.measureText(labelName).width;
+        let rx = (hostLabelConfig.textAlign === 'center') ? lx - tw/2 - pad
+               : (hostLabelConfig.textAlign === 'right')  ? lx - tw - pad : lx - pad;
+        octx.fillStyle = bg;
+        octx.fillRect(rx, ly - pad, tw + pad*2, fs + pad*2);
+      }
+      if (hostLabelConfig.shadowEnabled) {
+        octx.shadowOffsetX = hostLabelConfig.shadowOffsetX;
+        octx.shadowOffsetY = hostLabelConfig.shadowOffsetY;
+        octx.shadowBlur    = hostLabelConfig.shadowBlur;
+        octx.shadowColor   = hostLabelConfig.shadowColor;
+      }
+      octx.fillStyle = hostLabelConfig.color;
+      octx.fillText(labelName, lx, ly);
+      octx.restore();
+    }
+  }
+
+  // 選択肢画像（ストロークの上・判定の下）
+  if (currentChoiceImageUrl) await loadImageToCanvas(octx, currentChoiceImageUrl, 0, 0, W, H);
+
+  // 非fill型判定オーバーレイ（最前面）
+  if (type === 'JUDGE' && judgeImageUrl && !isFillJudge) {
+    await loadImageToCanvas(octx, judgeImageUrl, 0, 0, W, H);
+  }
+
+  const imageData = offscreen.toDataURL('image/png');
+  try {
+    const res = await fetch('/api/save-snapshot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        seatId: String(seatId).padStart(2, '0'),
+        session, counter, type, imageData
+      }),
+    });
+    const data = await res.json();
+    if (data.ok) showSaveToast(data.filename);
+  } catch (e) {
+    console.error('[Save Error]', e);
+  }
+}
+
+// 初期読み込み
+fetch('/api/save-state').then(r => r.json()).then(d => {
+  saveSession = d.session; saveCounter = d.counter; updateSaveUI();
+}).catch(() => {});
+
+const sessionInput = document.getElementById('save-session-input');
+async function applySessionInput() {
+  const v = parseInt(sessionInput.value);
+  if (!v || v < 1 || v > 99) { sessionInput.value = String(saveSession); return; }
+  if (v === saveSession) return;
+  if (!confirm(`Session を ${saveSession} → ${v} に変更しますか？連番は 000 にリセットされます。`)) {
+    sessionInput.value = String(saveSession); return;
+  }
+  const d = await fetch('/api/save-set-session', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session: v })
+  }).then(r => r.json());
+  saveSession = d.session; saveCounter = d.counter; updateSaveUI();
+}
+sessionInput.addEventListener('change', applySessionInput);
+sessionInput.addEventListener('keydown', e => { if (e.key === 'Enter') { sessionInput.blur(); applySessionInput(); } });
+
+const counterInput = document.getElementById('save-counter-input');
+async function applyCounterInput() {
+  const v = parseInt(counterInput.value);
+  if (isNaN(v) || v < 0 || v > 9999) { counterInput.value = String(saveCounter); return; }
+  if (v === saveCounter) return;
+  const d = await fetch('/api/save-set-counter', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ counter: v })
+  }).then(r => r.json());
+  saveSession = d.session; saveCounter = d.counter; updateSaveUI();
+}
+counterInput.addEventListener('change', applyCounterInput);
+counterInput.addEventListener('keydown', e => { if (e.key === 'Enter') { counterInput.blur(); applyCounterInput(); } });
+
+// ====================================================
+// 全体コントロール
+// ====================================================
+let allLockedState = false;
+function updateLockToggleBtn(locked) {
+  allLockedState = locked;
+  const btn = document.getElementById('g-lock-toggle');
+  if (!btn) return;
+  if (locked) {
+    btn.textContent = '全ロック中';
+    btn.className = 'g-btn btn-lock';
+  } else {
+    btn.textContent = '全ロック';
+    btn.className = 'g-btn btn-unlock';
+  }
+}
+document.getElementById('g-lock-toggle').addEventListener('click', () => {
+  if (allLockedState) socket.emit('host-unlock-all');
+  else socket.emit('host-lock-all');
+});
+document.getElementById('g-select-all').addEventListener('click', selectAllConnected);
+document.getElementById('g-deselect-all').addEventListener('click', deselectAll);
+document.getElementById('g-judge-clear').addEventListener('click', () => {
+  socket.emit('host-clear-overlay');
+  for (const [id] of seats) {
+    const jb = document.getElementById(`judgebtn-${id}`);
+    if (jb) jb.classList.remove('judged');
+  }
+});
+
+document.getElementById('g-clear-all').addEventListener('click', () => {
+  if (!confirm('全席のキャンバスをクリアしますか？')) return;
+  socket.emit('host-clear-all');
+  setGoActive(false);
+  setJudgeActive(false);
+  judgementKind.clear();
+  for (const [id] of seats) {
+    document.getElementById(`selbtn-${id}`)?.classList.remove('go-active');
+    const judgeBtn = document.getElementById(`judgebtn-${id}`);
+    if (judgeBtn) {
+      judgeBtn.classList.remove('judged', 'incorrect');
+      judgeBtn.textContent = '正解';
+    }
+  }
+  deselectAll();
+  socket.emit('host-clear-choice');
+});
+
+// 選択席 GO：選択→reveal、非選択→hide
+document.getElementById('g-go').addEventListener('click', async () => {
+  for (const [id, seat] of seats) {
+    if (!seat.connected) continue;
+    if (selectedSeats.has(id)) {
+      socket.emit('host-reveal', { seatId: id, animType: 'cut' });
+    } else {
+      socket.emit('host-hide', { seatId: id });
+    }
+  }
+  // 一時的な凹み表示（すぐ戻る）
+  setGoActive(true);
+  setTimeout(() => setGoActive(false), 200);
+  // 選択中の席に go-active を付与、非選択は除去
+  for (const [id] of seats) {
+    const selBtn = document.getElementById(`selbtn-${id}`);
+    if (selBtn) selBtn.classList.toggle('go-active', selectedSeats.has(id));
+  }
+  // 全席の judged をリセット
+  for (const [id] of seats) {
+    const jb = document.getElementById(`judgebtn-${id}`);
+    if (jb) jb.classList.remove('judged');
+  }
+  // 連番+1して選択席を GO として保存
+  try {
+    const d = await fetch('/api/save-next-counter', { method: 'POST' }).then(r => r.json());
+    saveSession = d.session; saveCounter = d.counter; updateSaveUI();
+    for (const id of selectedSeats) {
+      captureAndSave(id, 'GO', saveSession, saveCounter);
+    }
+  } catch (e) { console.error('[Save GO Error]', e); }
+});
+document.getElementById('g-judge').addEventListener('click', async () => {
+  // ── GO処理（フタを開ける） ──
+  for (const [id, seat] of seats) {
+    if (!seat.connected) continue;
+    if (selectedSeats.has(id)) {
+      socket.emit('host-reveal', { seatId: id, animType: 'cut' });
+    } else {
+      socket.emit('host-hide', { seatId: id });
+    }
+  }
+  for (const [id] of seats) {
+    const selBtn = document.getElementById(`selbtn-${id}`);
+    if (selBtn) selBtn.classList.toggle('go-active', selectedSeats.has(id));
+  }
+  for (const [id] of seats) {
+    const jb = document.getElementById(`judgebtn-${id}`);
+    if (jb) jb.classList.remove('judged');
+  }
+  try {
+    const d = await fetch('/api/save-next-counter', { method: 'POST' }).then(r => r.json());
+    saveSession = d.session; saveCounter = d.counter; updateSaveUI();
+    for (const id of selectedSeats) {
+      captureAndSave(id, 'GO', saveSession, saveCounter);
+    }
+  } catch (e) { console.error('[Save GO Error]', e); }
+
+  // ── 判定処理 ──
+  setJudgeActive(true);
+  setTimeout(() => setJudgeActive(false), 200);
+  const cSel = document.getElementById('judge-correct-sel');
+  const iSel = document.getElementById('judge-incorrect-sel');
+  for (const id of selectedSeats) {
+    const kind = getJudgeKind(id);
+    const imageUrl = kind === 'correct' ? (cSel.value || '') : (iSel.value || '');
+    pendingJudgeSaves.add(String(id));
+    socket.emit('host-judge', { seatId: id, kind, imageUrl });
+  }
+});
+
+// ====================================================
+// オーバーレイ画像一覧を引いてセレクトを構築
+fetch('/api/overlays').then(r => r.json()).then(({ correct, incorrect }) => {
+  const cSel = document.getElementById('judge-correct-sel');
+  const iSel = document.getElementById('judge-incorrect-sel');
+  correct.forEach(f => {
+    const o = document.createElement('option'); o.value = `/overlays/correct/${f}`; o.textContent = f; cSel.appendChild(o);
+  });
+  incorrect.forEach(f => {
+    const o = document.createElement('option'); o.value = `/overlays/incorrect/${f}`; o.textContent = f; iSel.appendChild(o);
+  });
+  const sc = localStorage.getItem('judge_correct_overlay');
+  const si = localStorage.getItem('judge_incorrect_overlay');
+  if (sc) cSel.value = sc;
+  if (si) iSel.value = si;
+  cSel.addEventListener('change', () => localStorage.setItem('judge_correct_overlay', cSel.value));
+  iSel.addEventListener('change', () => localStorage.setItem('judge_incorrect_overlay', iSel.value));
+});
+
+// 起動
+// ====================================================
+document.getElementById('host-url').textContent = `${location.host}`;
+
+// 1〜10席の外枠を先に生成
+for (let i = 1; i <= 10; i++) {
+  createSeatCard(String(i), { name: '未接続' });
+}
+
+connect();
+
+// ====================================================
+// レイアウトエディタ
+// ====================================================
+const LAYOUT_PRESETS = [
+  { label: '1×1', rows: 1, cols: 1 },
+  { label: '2×1', rows: 1, cols: 2 },
+  { label: '1×2', rows: 2, cols: 1 },
+  { label: '2×2', rows: 2, cols: 2 },
+  { label: '3×1', rows: 1, cols: 3 },
+  { label: '3×2', rows: 2, cols: 3 },
+  { label: '2×3', rows: 3, cols: 2 },
+  { label: '3×3', rows: 3, cols: 3 },
+  { label: '4×2', rows: 2, cols: 4 },
+  { label: '5×2', rows: 2, cols: 5 },
+];
+
+let layoutRows = 2, layoutCols = 2;
+let layoutCells = Array(4).fill(null);
+let layoutMode = 'grid'; // 'grid' | 'free'
+let freeCells = []; // { id, seatId, x, y, w, h } (パーセント)
+let freeBgUrl = null; // 選択中BG画像 URL
+let freeCellIdCounter = 0;
+let selectedCellId = null;
+let selectedCellIds = new Set();
+let activeCellEl = null;
+let aspectLockEnabled = false;
+let anchorPoint = 'tl'; // 'tl','tc','tr','ml','mc','mr','bl','bc','br'
+const ANCHOR_FACTORS = {
+  tl:[0,0], tc:[0.5,0], tr:[1,0],
+  ml:[0,0.5], mc:[0.5,0.5], mr:[1,0.5],
+  bl:[0,1], bc:[0.5,1], br:[1,1],
+};
+function anchorToDisplay(cell) {
+  const [ax, ay] = ANCHOR_FACTORS[anchorPoint];
+  return [
+    Math.round(toPxX(cell.x) + ax * toPxX(cell.w)),
+    Math.round(toPxY(cell.y) + ay * toPxY(cell.h)),
+  ];
+}
+function displayToTopLeft(dispX, dispY, cell) {
+  const [ax, ay] = ANCHOR_FACTORS[anchorPoint];
+  return [
+    fromPxX(dispX - ax * toPxX(cell.w)),
+    fromPxY(dispY - ay * toPxY(cell.h)),
+  ];
+}
+
+const DISP_W = 1920, DISP_H = 1080;
+function toPxX(pct) { return Math.round(pct / 100 * DISP_W); }
+function toPxY(pct) { return Math.round(pct / 100 * DISP_H); }
+function fromPxX(px) { return px / DISP_W * 100; }
+function fromPxY(py) { return py / DISP_H * 100; }
+
+const ANCHOR_TO_DIR = {
+  tl:'nw', tc:'n', tr:'ne',
+  ml:'w',  mc:null, mr:'e',
+  bl:'sw', bc:'s', br:'se'
+};
+function updateAnchorHandle(el) {
+  if (!el) return;
+  el.querySelectorAll('.rh').forEach(r => r.classList.remove('anchor-active'));
+  const dir = ANCHOR_TO_DIR[anchorPoint];
+  if (dir) {
+    const rh = el.querySelector(`.rh-${dir}`);
+    if (rh) rh.classList.add('anchor-active');
+  }
+}
+
+function selectFreeCell(cell, el, addToSelection = false, skipClear = false) {
+  if (!addToSelection && !skipClear) {
+    document.querySelectorAll('.free-cell.multi-selected')
+      .forEach(e => e.classList.remove('multi-selected'));
+    selectedCellIds.clear();
+    if (activeCellEl) activeCellEl.classList.remove('selected');
+  } else {
+    if (activeCellEl) activeCellEl.classList.remove('selected');
+  }
+  selectedCellId = cell.id;
+  activeCellEl = el;
+  el.classList.add('selected');
+  el.classList.remove('multi-selected');
+  selectedCellIds.add(cell.id);
+  updateInspector(cell);
+  updateAnchorHandle(el);
+}
+function updateInspector(cell) {
+  const name = cell.textOnly ? '📝 テキスト' : (cell.seatId ? `ID ${cell.seatId}` : '(未割当)');
+  document.getElementById('fci-title').textContent = name;
+  const [dispX, dispY] = anchorToDisplay(cell);
+  document.getElementById('fci-x').value = dispX;
+  document.getElementById('fci-y').value = dispY;
+  document.getElementById('fci-w').value = toPxX(cell.w);
+  document.getElementById('fci-h').value = toPxY(cell.h);
+  document.getElementById('fci-inputs').style.display = 'flex';
+  // テキスト設定を復元
+  document.getElementById('fci-text-color').value = cell.textColor || '#ffffff';
+  document.getElementById('fci-text-size').value = cell.textSize || 48;
+  const bgMatch = (cell.textBg || 'rgba(0,0,0,0.55)').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+  if (bgMatch) {
+    const hex = '#' + [bgMatch[1],bgMatch[2],bgMatch[3]].map(n => parseInt(n).toString(16).padStart(2,'0')).join('');
+    document.getElementById('fci-text-bg').value = hex;
+    const op = Math.round(parseFloat(bgMatch[4] ?? 1) * 100);
+    document.getElementById('fci-text-bg-opacity').value = op;
+    document.getElementById('fci-text-bg-opacity-val').textContent = op + '%';
+  }
+  document.querySelectorAll('.fci-valign-btn').forEach(b => b.classList.toggle('active', b.dataset.valign === (cell.textVAlign || 'bottom')));
+  document.querySelectorAll('.fci-halign-btn').forEach(b => b.classList.toggle('active', b.dataset.halign === (cell.textHAlign || 'left')));
+  document.getElementById('fci-text-section').classList.remove('no-selection');
+  // 詳細バー更新
+  const bar = document.getElementById('free-detail-bar');
+  bar.style.display = 'flex';
+  bar.innerHTML = `<span class="fdb-name">${name}</span>` +
+    `<span class="fdb-kv">X <span>${dispX}</span></span>` +
+    `<span class="fdb-kv">Y <span>${dispY}</span></span>` +
+    `<span class="fdb-kv">W <span>${toPxX(cell.w)}</span></span>` +
+    `<span class="fdb-kv">H <span>${toPxY(cell.h)}</span></span>` +
+    `<span class="fdb-kv" style="color:#4b5563">px</span>`;
+}
+function updatePosBadge(el, cell) {
+  const b = el.querySelector('.free-cell-pos-badge');
+  if (b) b.textContent = `${toPxX(cell.w)}×${toPxY(cell.h)}px`;
+}
+
+// ── モード切り替え ──
+function setLayoutMode(mode) {
+  layoutMode = mode;
+  document.getElementById('lmode-grid').classList.toggle('active', mode === 'grid');
+  document.getElementById('lmode-free').classList.toggle('active', mode === 'free');
+  document.getElementById('layout-grid-section').classList.toggle('hidden', mode === 'free');
+  document.getElementById('layout-free-section').classList.toggle('active', mode === 'free');
+}
+document.getElementById('lmode-grid').addEventListener('click', () => setLayoutMode('grid'));
+document.getElementById('lmode-free').addEventListener('click', () => { setLayoutMode('free'); buildFreeEditor(); buildFreeSaveSlots(); loadBgPicker(); });
+
+// ── BGピッカー ──
+function updateCanvasBg() {
+  const wrap = document.getElementById('free-canvas-wrap');
+  if (freeBgUrl) {
+    wrap.style.backgroundImage = `url("${freeBgUrl}")`;
+    wrap.style.backgroundSize = 'cover';
+    wrap.style.backgroundPosition = 'center';
+  } else {
+    wrap.style.backgroundImage = '';
+  }
+}
+function refreshBgPickerSelection() {
+  document.getElementById('free-bg-none').classList.toggle('selected', !freeBgUrl);
+  document.querySelectorAll('.bg-thumb').forEach(b =>
+    b.classList.toggle('selected', b.dataset.url === freeBgUrl)
+  );
+}
+// BGピッカー: フェッチ完了次第→非表示DOMに先構築（モーダル開時は常に即表示）
+let _bgFiles = null;
+fetch('/api/backgrounds-host').then(r => r.json()).catch(() => []).then(files => {
+  _bgFiles = files;
+  applyBgThumbs(files);
+});
+
+function loadBgPicker() {
+  if (_bgFiles !== null) applyBgThumbs(_bgFiles);
+}
+function applyBgThumbs(files) {
+  const container = document.getElementById('free-bg-thumbs');
+  if (!container) return;
+  container.innerHTML = '';
+  for (const f of files) {
+    const url = '/backgrounds_host/' + encodeURIComponent(f);
+    const btn = document.createElement('button');
+    btn.className = 'bg-thumb';
+    btn.title = f;
+    btn.dataset.url = url;
+    btn.style.backgroundImage = `url("${url}")`;
+    if (freeBgUrl === url) btn.classList.add('selected');
+    btn.addEventListener('click', () => {
+      freeBgUrl = (freeBgUrl === url) ? null : url;
+      updateCanvasBg();
+      refreshBgPickerSelection();
+    });
+    container.appendChild(btn);
+  }
+}
+document.getElementById('free-bg-none').addEventListener('click', () => {
+  freeBgUrl = null;
+  updateCanvasBg();
+  refreshBgPickerSelection();
+});
+
+// ── グリッドモード ──
+function buildLayoutPresets() {
+  const container = document.getElementById('layout-presets');
+  container.innerHTML = '';
+  for (const p of LAYOUT_PRESETS) {
+    const btn = document.createElement('button');
+    btn.className = 'layout-preset-btn' + (p.rows === layoutRows && p.cols === layoutCols ? ' active' : '');
+    btn.textContent = p.label;
+    btn.addEventListener('click', () => {
+      layoutRows = p.rows; layoutCols = p.cols;
+      layoutCells = Array(layoutRows * layoutCols).fill(null);
+      buildLayoutPresets();
+      buildLayoutEditorGrid();
+    });
+    container.appendChild(btn);
+  }
+}
+
+function buildLayoutEditorGrid() {
+  const grid = document.getElementById('layout-editor-grid');
+  grid.style.gridTemplateColumns = `repeat(${layoutCols}, 1fr)`;
+  grid.innerHTML = '';
+  for (let i = 0; i < layoutRows * layoutCols; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'layout-cell-btn' + (layoutCells[i] ? ' assigned' : '');
+    btn.dataset.index = i;
+    btn.textContent = layoutCells[i] ? `ID ${layoutCells[i]}` : '＋';
+    btn.addEventListener('click', () => {
+      const allIds = Array.from({ length: 10 }, (_, k) => String(k + 1));
+      const cur = layoutCells[i];
+      const idx = cur ? allIds.indexOf(cur) : -1;
+      layoutCells[i] = idx + 1 < allIds.length ? allIds[idx + 1] : null;
+      buildLayoutEditorGrid();
+    });
+    grid.appendChild(btn);
+  }
+}
+
+// ── フリーモード ──
+// ラバーバンド初期化フラグ
+let _rubberBandInitialized = false;
+
+function buildFreeEditor() {
+  const prevSelected = selectedCellId;
+  const prevMultiSelected = new Set(selectedCellIds);
+  activeCellEl = null; selectedCellId = null; selectedCellIds = new Set();
+  const canvas = document.getElementById('free-canvas');
+  canvas.innerHTML = '';
+  for (const cell of freeCells) renderFreeCell(cell);
+  if (prevSelected !== null) {
+    const newEl = canvas.querySelector('[data-cell-id="' + prevSelected + '"]');
+    if (newEl) { const c2 = freeCells.find(c=>c.id===prevSelected); if (c2) selectFreeCell(c2, newEl, false, true); }
+  }
+  for (const id of prevMultiSelected) {
+    if (id === prevSelected) continue;
+    const el = canvas.querySelector('[data-cell-id="' + id + '"]');
+    if (el) { el.classList.add('multi-selected'); selectedCellIds.add(id); }
+  }
+  initFreeCanvasRubberBand();
+}
+
+function applyFreeCellTextOverlay(el, cell) {
+  let wrap = el.querySelector('.free-cell-text-wrap');
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.className = 'free-cell-text-wrap';
+    const lbl = document.createElement('div');
+    lbl.className = 'free-cell-text-label';
+    wrap.appendChild(lbl);
+    el.appendChild(wrap);
+  }
+  const lbl = wrap.querySelector('.free-cell-text-label');
+  if (!cell.text) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'flex';
+  lbl.textContent = cell.text;
+  lbl.style.color = cell.textColor || '#ffffff';
+  lbl.style.backgroundColor = cell.textBg || 'rgba(0,0,0,0.55)';
+  lbl.style.textAlign = cell.textHAlign || 'left';
+  const vMap = { top: 'flex-start', center: 'center', bottom: 'flex-end' };
+  const hMap = { left: 'flex-start', center: 'center', right: 'flex-end' };
+  wrap.style.justifyContent = vMap[cell.textVAlign || 'bottom'];
+  lbl.style.alignSelf = hMap[cell.textHAlign || 'left'];
+  if (cell.textOnly) {
+    const freeCanvas = document.getElementById('free-canvas');
+    const canvasH = freeCanvas ? freeCanvas.offsetHeight : 1;
+    const scaledPx = Math.round((cell.textSize || 64) * canvasH / 1080);
+    lbl.style.fontSize = Math.max(8, scaledPx) + 'px';
+    lbl.style.fontWeight = 'bold';
+    lbl.style.lineHeight = '1.3';
+    wrap.style.padding = '4px';
+  }
+}
+
+function renderFreeCell(cell) {
+  const canvas = document.getElementById('free-canvas');
+  const el = document.createElement('div');
+  el.className = 'free-cell';
+  el.dataset.cellId = String(cell.id);
+  el.style.left   = cell.x + '%';
+  el.style.top    = cell.y + '%';
+  el.style.width  = cell.w + '%';
+  el.style.height = cell.h + '%';
+
+  const tb = document.createElement('div');
+  tb.className = 'free-cell-toolbar';
+
+  if (cell.textOnly) {
+    el.classList.add('text-only');
+    const lbl = document.createElement('span');
+    lbl.textContent = '📝 テキスト';
+    lbl.style.cssText = 'flex:1;font-size:0.65rem;color:#fff;font-weight:bold;padding-left:2px;';
+    const del2 = document.createElement('button');
+    del2.className = 'free-cell-del'; del2.textContent = '✕'; del2.style.color = '#fff';
+    del2.addEventListener('mousedown', e => e.stopPropagation());
+    del2.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectedCellIds.delete(cell.id);
+      if (selectedCellId === cell.id) {
+        selectedCellId = null; activeCellEl = null;
+        document.getElementById('fci-inputs').style.display = 'none';
+        document.getElementById('fci-title').textContent = '← パネルを選択';
+        document.getElementById('free-detail-bar').style.display = 'none';
+        document.getElementById('fci-text-section').classList.add('no-selection');
+      }
+      freeCells = freeCells.filter(c => c.id !== cell.id); buildFreeEditor();
+    });
+    tb.appendChild(lbl); tb.appendChild(del2);
+    el.appendChild(tb);
+    applyFreeCellTextOverlay(el, cell);
+    // ダブルクリックで直接テキスト編集
+    el.addEventListener('dblclick', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const wrap = el.querySelector('.free-cell-text-wrap');
+      const lbl2  = el.querySelector('.free-cell-text-label');
+      if (!wrap || !lbl2) return;
+      const ta = document.createElement('textarea');
+      ta.value = cell.text || '';
+      ta.style.cssText = 'position:absolute;inset:0;z-index:20;width:100%;height:100%;background:rgba(0,0,10,0.55);color:' + (cell.textColor||'#fff') + ';font-size:' + (lbl2.style.fontSize||'1em') + ';font-weight:bold;border:2px solid #f59e0b;border-radius:0;resize:none;outline:none;padding:4px 8px;text-align:' + (cell.textHAlign||'center') + ';box-sizing:border-box;line-height:1.3;';
+      el.appendChild(ta); ta.focus(); ta.select();
+      ta.addEventListener('input', () => { cell.text = ta.value; lbl2.textContent = ta.value; });
+      const finish = () => { ta.remove(); applyFreeCellTextOverlay(el, cell); };
+      ta.addEventListener('blur', finish, { once: true });
+      ta.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape') ta.blur();
+        if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); ta.blur(); }
+      });
+    });
+  } else {
+    const sel = document.createElement('select');
+    sel.className = 'free-cell-seat-sel';
+    sel.innerHTML = '<option value="">空</option>' +
+      Array.from({length:10},(_,i)=>`<option value="${i+1}"${cell.seatId==`${i+1}`?' selected':''}>ID ${i+1}</option>`).join('');
+    sel.addEventListener('change', (e) => { e.stopPropagation(); cell.seatId = sel.value || null; if (selectedCellId===cell.id) updateInspector(cell); });
+    const del = document.createElement('button');
+    del.className = 'free-cell-del'; del.textContent = '✕';
+    del.addEventListener('mousedown', (e) => e.stopPropagation());
+    del.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectedCellIds.delete(cell.id);
+      if (selectedCellId === cell.id) {
+        selectedCellId = null; activeCellEl = null;
+        document.getElementById('fci-inputs').style.display = 'none';
+        document.getElementById('fci-title').textContent = '← パネルを選択';
+        document.getElementById('free-detail-bar').style.display = 'none';
+        document.getElementById('fci-text-section').classList.add('no-selection');
+      }
+      freeCells = freeCells.filter(c=>c.id!==cell.id); buildFreeEditor();
+    });
+    tb.appendChild(sel); tb.appendChild(del);
+    el.appendChild(tb);
+    applyFreeCellTextOverlay(el, cell);
+  }
+
+  const badge = document.createElement('div');
+  badge.className = 'free-cell-pos-badge';
+  badge.textContent = `${toPxX(cell.w)}×${toPxY(cell.h)}px`;
+  el.appendChild(badge);
+
+  for (const dir of ['nw','n','ne','e','se','s','sw','w']) {
+    const rh = document.createElement('div');
+    rh.className = `rh rh-${dir}`;
+    rh.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); selectFreeCell(cell, el); startFreeResize(e, cell, dir, el); });
+    el.appendChild(rh);
+  }
+
+  el.addEventListener('mousedown', (e) => {
+    if (e.target.classList.contains('rh') || e.target.closest('.free-cell-del') || e.target.tagName === 'SELECT') return;
+    e.preventDefault();
+    if (e.shiftKey) {
+      if (selectedCellIds.has(cell.id)) {
+        el.classList.remove('selected', 'multi-selected');
+        selectedCellIds.delete(cell.id);
+        if (selectedCellId === cell.id) {
+          const next = [...selectedCellIds][0];
+          if (next !== undefined) {
+            const nc = freeCells.find(c => c.id === next);
+            const ne = document.querySelector('[data-cell-id="' + next + '"]');
+            if (nc && ne) selectFreeCell(nc, ne, true);
+          } else { selectedCellId = null; activeCellEl = null; }
+        }
+        return;
+      } else {
+        if (selectedCellIds.size === 0) { selectFreeCell(cell, el, false); }
+        else { el.classList.add('multi-selected'); selectedCellIds.add(cell.id); }
+      }
+    } else {
+      if (selectedCellIds.has(cell.id) && selectedCellIds.size > 1) {
+        if (selectedCellId !== cell.id) {
+          if (activeCellEl) { activeCellEl.classList.remove('selected'); activeCellEl.classList.add('multi-selected'); }
+          activeCellEl = el; selectedCellId = cell.id;
+          el.classList.remove('multi-selected'); el.classList.add('selected');
+          updateInspector(cell); updateAnchorHandle(el);
+        }
+      } else { selectFreeCell(cell, el); }
+    }
+    startFreeMove(e, cell, el);
+  });
+  canvas.appendChild(el);
+}
+
+function getFreeCanvasRect() { return document.getElementById('free-canvas').getBoundingClientRect(); }
+
+// キャンバス背景でのラバーバンド選択（初回1度だけ登録）
+function initFreeCanvasRubberBand() {
+  if (_rubberBandInitialized) return;
+  _rubberBandInitialized = true;
+  const canvas = document.getElementById('free-canvas');
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.target !== canvas) return;
+    e.preventDefault();
+    if (!e.shiftKey) {
+      canvas.querySelectorAll('.free-cell.selected,.free-cell.multi-selected')
+        .forEach(el => el.classList.remove('selected', 'multi-selected'));
+      selectedCellIds.clear(); selectedCellId = null; activeCellEl = null;
+      document.getElementById('fci-inputs').style.display = 'none';
+      document.getElementById('fci-title').textContent = '← パネルを選択';
+      document.getElementById('free-detail-bar').style.display = 'none';
+      document.getElementById('fci-text-section').classList.add('no-selection');
+    }
+    const canvasRect = canvas.getBoundingClientRect();
+    const startX = e.clientX - canvasRect.left;
+    const startY = e.clientY - canvasRect.top;
+    const rb = document.createElement('div');
+    rb.id = 'rubber-band';
+    rb.style.left = startX + 'px'; rb.style.top = startY + 'px';
+    rb.style.width = '0'; rb.style.height = '0';
+    canvas.appendChild(rb);
+    let rbLeft = startX, rbTop = startY, rbRight = startX, rbBottom = startY;
+    const onMove = (ev) => {
+      const cx = ev.clientX - canvasRect.left;
+      const cy = ev.clientY - canvasRect.top;
+      rbLeft   = Math.min(cx, startX); rbTop    = Math.min(cy, startY);
+      rbRight  = Math.max(cx, startX); rbBottom = Math.max(cy, startY);
+      rb.style.left   = rbLeft + 'px'; rb.style.top    = rbTop  + 'px';
+      rb.style.width  = (rbRight  - rbLeft) + 'px';
+      rb.style.height = (rbBottom - rbTop)  + 'px';
+    };
+    const onUp = () => {
+      rb.remove();
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      const cw = canvasRect.width, ch = canvasRect.height;
+      if (cw === 0 || ch === 0) return;
+      const selL = rbLeft / cw * 100, selT = rbTop / ch * 100;
+      const selR = rbRight / cw * 100, selB = rbBottom / ch * 100;
+      if (selR - selL < 1 && selB - selT < 1) return;
+      let first = true;
+      for (const cell of freeCells) {
+        const cx2 = cell.x + cell.w / 2, cy2 = cell.y + cell.h / 2;
+        if (cx2 >= selL && cx2 <= selR && cy2 >= selT && cy2 <= selB) {
+          const domEl = canvas.querySelector('[data-cell-id="' + cell.id + '"]');
+          if (!domEl) continue;
+          if (first && !e.shiftKey) {
+            selectFreeCell(cell, domEl, false, true); first = false;
+          } else {
+            domEl.classList.add('multi-selected');
+            selectedCellIds.add(cell.id);
+          }
+        }
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  });
+}
+
+function startFreeMove(e, cell, el) {
+  const rect = getFreeCanvasRect();
+  const sx = e.clientX, sy = e.clientY;
+  const origins = new Map();
+  const moveIds = selectedCellIds.size > 1 ? new Set(selectedCellIds) : new Set([cell.id]);
+  for (const id of moveIds) {
+    const c = freeCells.find(c => c.id === id);
+    if (c) origins.set(id, { x: c.x, y: c.y });
+  }
+  if (!origins.has(cell.id)) origins.set(cell.id, { x: cell.x, y: cell.y });
+  const onMove = (ev) => {
+    const dx = (ev.clientX - sx) / rect.width  * 100;
+    const dy = (ev.clientY - sy) / rect.height * 100;
+    for (const [id, origin] of origins) {
+      const c = freeCells.find(c => c.id === id);
+      if (!c) continue;
+      c.x = Math.max(0, Math.min(100 - c.w, origin.x + dx));
+      c.y = Math.max(0, Math.min(100 - c.h, origin.y + dy));
+      const domEl = document.querySelector('[data-cell-id="' + id + '"]');
+      if (domEl) { domEl.style.left = c.x + '%'; domEl.style.top = c.y + '%'; updatePosBadge(domEl, c); }
+    }
+    if (selectedCellId === cell.id) updateInspector(cell);
+  };
+  const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+}
+
+function startFreeResize(e, cell, dir, el) {
+  const rect = getFreeCanvasRect();
+  const sx = e.clientX, sy = e.clientY;
+  const snap = { x: cell.x, y: cell.y, w: cell.w, h: cell.h };
+  const MIN_W = fromPxX(10), MIN_H = fromPxY(10);
+  // ドラッグ開始時のピクセル縦横比をスナップ
+  const snapAR = aspectLockEnabled ? (toPxX(snap.w) / toPxY(snap.h)) : null;
+  const hasHoriz = dir.includes('e') || dir.includes('w');
+
+  const onMove = (e) => {
+    const dx = (e.clientX - sx) / rect.width  * 100;
+    const dy = (e.clientY - sy) / rect.height * 100;
+
+    if (snapAR !== null) {
+      if (hasHoriz) {
+        // 横幅が縦幅を決定
+        let new_w;
+        if (dir.includes('e')) {
+          new_w = Math.max(MIN_W, Math.min(100 - snap.x, snap.w + dx));
+        } else {
+          new_w = Math.max(MIN_W, snap.w - dx);
+          cell.x = Math.max(0, snap.x + snap.w - new_w);
+        }
+        cell.w = new_w;
+        const new_h_px = Math.max(10, Math.round(toPxX(new_w) / snapAR));
+        cell.h = Math.min(100 - snap.y, fromPxY(new_h_px));
+        if (dir.includes('n')) cell.y = Math.max(0, snap.y + snap.h - cell.h);
+      } else {
+        // 縦幅が横幅を決定 (pure n/s)
+        let new_h;
+        if (dir.includes('s')) {
+          new_h = Math.max(MIN_H, Math.min(100 - snap.y, snap.h + dy));
+        } else {
+          new_h = Math.max(MIN_H, snap.h - dy);
+          cell.y = Math.max(0, snap.y + snap.h - new_h);
+        }
+        cell.h = new_h;
+        const new_w_px = Math.max(10, Math.round(toPxY(new_h) * snapAR));
+        cell.w = Math.min(100 - snap.x, fromPxX(new_w_px));
+      }
+    } else {
+      if (dir.includes('e')) cell.w = Math.max(MIN_W, Math.min(100 - snap.x, snap.w + dx));
+      if (dir.includes('s')) cell.h = Math.max(MIN_H, Math.min(100 - snap.y, snap.h + dy));
+      if (dir.includes('w')) {
+        const nw = Math.max(MIN_W, snap.w - dx);
+        cell.x = Math.max(0, snap.x + snap.w - nw); cell.w = nw;
+      }
+      if (dir.includes('n')) {
+        const nh = Math.max(MIN_H, snap.h - dy);
+        cell.y = Math.max(0, snap.y + snap.h - nh); cell.h = nh;
+      }
+    }
+    el.style.left = cell.x+'%'; el.style.top = cell.y+'%';
+    el.style.width = cell.w+'%'; el.style.height = cell.h+'%';
+    updatePosBadge(el, cell);
+    if (selectedCellId === cell.id) updateInspector(cell);
+  };
+  const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+}
+
+document.getElementById('btn-add-free-cell').addEventListener('click', () => {
+  // デフォルト 640×360px (1920×1080基準で 33.33%×33.33%)
+  freeCells.push({ id: ++freeCellIdCounter, seatId: null, x: 10, y: 10, w: fromPxX(640), h: fromPxY(360),
+    text: '', textColor: '#ffffff', textBg: 'rgba(0,0,0,0.55)', textSize: 48, textVAlign: 'bottom', textHAlign: 'left' });
+  buildFreeEditor();
+});
+
+document.getElementById('btn-add-text-cell').addEventListener('click', () => {
+  freeCells.push({ id: ++freeCellIdCounter, seatId: null, textOnly: true,
+    x: 10, y: 10, w: fromPxX(400), h: fromPxY(120),
+    text: 'テキスト', textColor: '#ffffff', textBg: 'rgba(0,0,0,0.0)', textSize: 64, textVAlign: 'center', textHAlign: 'center' });
+  buildFreeEditor();
+});
+
+// テキストインスペクター
+function _getSelectedCell() {
+  if (selectedCellId === null) return null;
+  return freeCells.find(c => c.id === selectedCellId) || null;
+}
+function _refreshSelectedOverlay() {
+  const cell = _getSelectedCell(); if (!cell) return;
+  const el = document.querySelector('[data-cell-id="' + cell.id + '"]');
+  if (el) applyFreeCellTextOverlay(el, cell);
+}
+function _rebuildTextBg(cell) {
+  const bgHex = document.getElementById('fci-text-bg').value;
+  const bgOp  = parseInt(document.getElementById('fci-text-bg-opacity').value) / 100;
+  const r = parseInt(bgHex.slice(1,3),16), g = parseInt(bgHex.slice(3,5),16), b = parseInt(bgHex.slice(5,7),16);
+  cell.textBg = `rgba(${r},${g},${b},${bgOp})`;
+}
+document.getElementById('fci-text-color').addEventListener('input', () => {
+  const cell = _getSelectedCell(); if (!cell) return;
+  cell.textColor = document.getElementById('fci-text-color').value;
+  _refreshSelectedOverlay();
+});
+document.getElementById('fci-text-bg').addEventListener('input', () => {
+  const cell = _getSelectedCell(); if (!cell) return;
+  _rebuildTextBg(cell); _refreshSelectedOverlay();
+});
+document.getElementById('fci-text-bg-opacity').addEventListener('input', () => {
+  const cell = _getSelectedCell(); if (!cell) return;
+  const op = document.getElementById('fci-text-bg-opacity').value;
+  document.getElementById('fci-text-bg-opacity-val').textContent = op + '%';
+  _rebuildTextBg(cell); _refreshSelectedOverlay();
+});
+document.getElementById('fci-text-size').addEventListener('change', () => {
+  const cell = _getSelectedCell(); if (!cell) return;
+  cell.textSize = parseInt(document.getElementById('fci-text-size').value) || 48;
+  _refreshSelectedOverlay();
+});
+document.querySelectorAll('.fci-valign-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const cell = _getSelectedCell(); if (!cell) return;
+    cell.textVAlign = btn.dataset.valign;
+    document.querySelectorAll('.fci-valign-btn').forEach(b => b.classList.toggle('active', b.dataset.valign === cell.textVAlign));
+    _refreshSelectedOverlay();
+  });
+});
+document.querySelectorAll('.fci-halign-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const cell = _getSelectedCell(); if (!cell) return;
+    cell.textHAlign = btn.dataset.halign;
+    document.querySelectorAll('.fci-halign-btn').forEach(b => b.classList.toggle('active', b.dataset.halign === cell.textHAlign));
+    _refreshSelectedOverlay();
+  });
+});
+
+// ── フリーレイアウト 保存スロット ──
+const FREE_SLOTS_KEY = 'lc_patterns_v1';
+const FREE_SLOT_COUNT = 10;
+
+function loadFreeSlotsFromStorage() {
+  try {
+    const raw = localStorage.getItem(FREE_SLOTS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    while (arr.length < FREE_SLOT_COUNT) arr.push(null);
+    return arr.slice(0, FREE_SLOT_COUNT);
+  } catch { return Array(FREE_SLOT_COUNT).fill(null); }
+}
+function saveFreeSlotsToStorage(slots) {
+  localStorage.setItem(FREE_SLOTS_KEY, JSON.stringify(slots));
+}
+
+function buildFreeSaveSlots() {
+  const container = document.getElementById('free-save-slots');
+  if (!container) return;
+  container.innerHTML = '';
+  const slots = loadFreeSlotsFromStorage();
+  for (let i = 0; i < FREE_SLOT_COUNT; i++) {
+    const slot = slots[i];
+    const row = document.createElement('div');
+    row.className = 'free-save-row';
+
+    const num = document.createElement('span');
+    num.className = 'free-save-num';
+    num.textContent = (i + 1) + '.';
+
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'free-save-name' + (slot ? ' has-data' : '');
+    nameInput.placeholder = `スロット ${i + 1}`;
+    if (slot) nameInput.value = slot.name || `スロット ${i + 1}`;
+    nameInput.addEventListener('mousedown', e => e.stopPropagation());
+    nameInput.addEventListener('click', e => e.stopPropagation());
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'free-save-btn free-save-btn-save';
+    saveBtn.textContent = '保存';
+    saveBtn.title = '現在のパネル構成を保存';
+    const doSave = () => {
+      const s = loadFreeSlotsFromStorage();
+      const slotName = nameInput.value.trim() || `スロット ${i + 1}`;
+      // layout-control互換フォーマット: mode:'free', freeCells:[]
+      s[i] = { name: slotName, mode: 'free', freeCells: freeCells.map(c => ({ ...c })), bgUrl: freeBgUrl || null };
+      saveFreeSlotsToStorage(s);
+      buildFreeSaveSlots();
+    };
+    saveBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (freeCells.length === 0) return;
+      const slotName = nameInput.value.trim() || `スロット ${i + 1}`;
+      const s = loadFreeSlotsFromStorage();
+      if (s[i] !== null) {
+        // 上書き確認（Electron対応のカスタムモーダル）
+        hostConfirm(`「${slotName}」に現在のレイアウトを上書き保存しますか？`, 'overwrite', doSave);
+      } else {
+        doSave();
+      }
+    });
+
+    const loadBtn = document.createElement('button');
+    loadBtn.className = 'free-save-btn free-save-btn-load';
+    loadBtn.textContent = '読込';
+    // gridモードスロットは読込不可
+    loadBtn.disabled = !slot || slot.mode === 'grid';
+    loadBtn.title = (slot && slot.mode === 'grid') ? 'グリッドモードのデータは親機エディタで読込できません' : 'スロットをエディタに読込';
+    loadBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const s = loadFreeSlotsFromStorage();
+      const p = s[i];
+      if (!p) return;
+      if (p.mode === 'grid') return; // グリッドスロットはスキップ
+      // layout-control互換(freeCells)と旧形式(cells)の両方に対応
+      freeCells = (p.freeCells || p.cells || []).map(c => ({ ...c, id: ++freeCellIdCounter }));
+      freeBgUrl = p.bgUrl || null;
+      updateCanvasBg();
+      refreshBgPickerSelection();
+      buildFreeEditor();
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'free-save-btn free-save-btn-del';
+    delBtn.textContent = '削除';
+    delBtn.disabled = !slot;
+    delBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      hostConfirm(`スロット ${i + 1} を削除しますか？`, 'delete', () => {
+        const s = loadFreeSlotsFromStorage();
+        s[i] = null;
+        saveFreeSlotsToStorage(s);
+        buildFreeSaveSlots();
+      });
+    });
+
+    row.appendChild(num);
+    row.appendChild(nameInput);
+    row.appendChild(saveBtn);
+    row.appendChild(loadBtn);
+    row.appendChild(delBtn);
+    container.appendChild(row);
+  }
+}
+
+// インスペクター数値入力 (ピクセル単位)
+// buildFreeEditor()を呼ばずDOMを直接更新することで、
+// 同値入力時にchangeが発火しなくなる問題を回避する
+for (const key of ['x','y','w','h']) {
+  document.getElementById(`fci-${key}`).addEventListener('change', () => {
+    if (selectedCellId === null) return;
+    const cell = freeCells.find(c => c.id === selectedCellId);
+    if (!cell) return;
+    const px = parseInt(document.getElementById(`fci-${key}`).value, 10);
+    if (isNaN(px)) return;
+    const old_w_px = toPxX(cell.w), old_h_px = toPxY(cell.h);
+    if (key === 'w') {
+      const nw = Math.max(10, Math.min(DISP_W, px));
+      const [ax] = ANCHOR_FACTORS[anchorPoint];
+      const anchorXpx = toPxX(cell.x) + ax * old_w_px;
+      cell.w = fromPxX(nw);
+      if (aspectLockEnabled && old_w_px > 0) cell.h = fromPxY(Math.max(10, Math.round(nw * old_h_px / old_w_px)));
+      cell.x = Math.max(0, Math.min(fromPxX(DISP_W - nw), fromPxX(anchorXpx - ax * nw)));
+    } else if (key === 'h') {
+      const nh = Math.max(10, Math.min(DISP_H, px));
+      const [, ay] = ANCHOR_FACTORS[anchorPoint];
+      const anchorYpx = toPxY(cell.y) + ay * old_h_px;
+      cell.h = fromPxY(nh);
+      if (aspectLockEnabled && old_h_px > 0) cell.w = fromPxX(Math.max(10, Math.round(nh * old_w_px / old_h_px)));
+      cell.y = Math.max(0, Math.min(fromPxY(DISP_H - nh), fromPxY(anchorYpx - ay * nh)));
+    } else if (key === 'x') {
+      const [nx] = displayToTopLeft(px, toPxY(cell.y) + ANCHOR_FACTORS[anchorPoint][1] * toPxY(cell.h), cell);
+      cell.x = Math.max(0, Math.min(fromPxX(DISP_W - toPxX(cell.w)), nx));
+    } else {
+      const [, ny] = displayToTopLeft(toPxX(cell.x) + ANCHOR_FACTORS[anchorPoint][0] * toPxX(cell.w), px, cell);
+      cell.y = Math.max(0, Math.min(fromPxY(DISP_H - toPxY(cell.h)), ny));
+    }
+    // セル要素の位置・サイズをDOMで直接更新（再構築しない）
+    const el = activeCellEl || document.querySelector(`[data-cell-id="${cell.id}"]`);
+    if (el) {
+      el.style.left   = cell.x + '%';
+      el.style.top    = cell.y + '%';
+      el.style.width  = cell.w + '%';
+      el.style.height = cell.h + '%';
+      updatePosBadge(el, cell);
+      updateAnchorHandle(el);
+    }
+    updateInspector(cell);
+  });
+}
+
+// アンカーピッカー
+document.getElementById('fci-anchor').addEventListener('click', (e) => {
+  const dot = e.target.closest('.fci-anchor-dot');
+  if (!dot) return;
+  anchorPoint = dot.dataset.anchor;
+  document.querySelectorAll('.fci-anchor-dot').forEach(d =>
+    d.classList.toggle('active', d.dataset.anchor === anchorPoint)
+  );
+  if (selectedCellId !== null) {
+    const cell = freeCells.find(c => c.id === selectedCellId);
+    if (cell) updateInspector(cell);
+    updateAnchorHandle(activeCellEl);
+  }
+});
+
+document.getElementById('fci-lock').addEventListener('change', (e) => {
+  aspectLockEnabled = e.target.checked;
+});
+
+document.getElementById('layout-reset-btn').addEventListener('click', () => {
+  if (layoutMode === 'grid') {
+    layoutCells = Array(layoutRows * layoutCols).fill(null);
+    buildLayoutEditorGrid();
+  } else {
+    freeCells = [];
+    buildFreeEditor();
+  }
+});
+document.getElementById('layout-apply-btn').addEventListener('click', () => {
+  const group = (document.getElementById('layout-target-group').value || '').trim() || 'default';
+  if (layoutMode === 'grid') {
+    socket.emit('display-layout', { group, type: 'grid', rows: layoutRows, cols: layoutCols, cells: [...layoutCells] });
+  } else {
+    socket.emit('display-layout', { group, type: 'free', cells: freeCells.map(c=>({ seatId: c.seatId||null, x: c.x, y: c.y, w: c.w, h: c.h,
+      textOnly: c.textOnly || false,
+      text: c.text || null, textColor: c.textColor || '#ffffff',
+      textBg: c.textBg || null, textSize: c.textSize || 48,
+      textVAlign: c.textVAlign || 'bottom', textHAlign: c.textHAlign || 'left' })), bgUrl: freeBgUrl || null });
+  }
+  // 適用後はモーダルを閉じない（継続編集可）
+});
+
+// ── システム設定モーダル（タブ付き） ──────────────────────
+let judgeColorMode = localStorage.getItem('judgeColorMode') === '1';
+(function() {
+  const chk = document.getElementById('chk-judge-color-mode');
+  if (chk) chk.checked = judgeColorMode;
+  updateJudgeInvertBadge(judgeColorMode);
+  const savedDarkness = parseInt(localStorage.getItem('lockDarkness') ?? '65');
+  applyLockDarknessUI(isNaN(savedDarkness) ? 65 : savedDarkness);
+  try {
+    const savedLabel = JSON.parse(localStorage.getItem('labelConfig'));
+    if (savedLabel) { _applyConfigToLabelUI(savedLabel); hostLabelConfig = savedLabel; }
+  } catch (_) {}
+})();
+document.getElementById('btn-settings-open').addEventListener('click', () => {
+  document.getElementById('settings-modal-overlay').classList.add('open');
+});
+document.getElementById('settings-modal-close').addEventListener('click', () => {
+  document.getElementById('settings-modal-overlay').classList.remove('open');
+});
+document.getElementById('settings-modal-overlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+});
+// コンパネ背景色
+(function() {
+  const saved = localStorage.getItem('pageBgColor');
+  if (saved) {
+    document.documentElement.style.setProperty('--bg', saved);
+    document.documentElement.style.setProperty('--ctrl-bg', saved);
+    document.documentElement.style.setProperty('--surface', saved);
+    const el = document.getElementById('ctrl-bg-color');
+    if (el) el.value = saved;
+  }
+})();
+document.getElementById('ctrl-bg-color').addEventListener('input', (e) => {
+  document.documentElement.style.setProperty('--bg', e.target.value);
+  document.documentElement.style.setProperty('--ctrl-bg', e.target.value);
+  document.documentElement.style.setProperty('--surface', e.target.value);
+  localStorage.setItem('pageBgColor', e.target.value);
+});
+document.getElementById('ctrl-bg-reset').addEventListener('click', () => {
+  const def = '#1a1a1a';
+  document.documentElement.style.setProperty('--bg', def);
+  document.documentElement.style.setProperty('--ctrl-bg', def);
+  document.documentElement.style.setProperty('--surface', def);
+  document.getElementById('ctrl-bg-color').value = def;
+  localStorage.setItem('pageBgColor', def);
+});
+
+function updateJudgeInvertBadge(enabled) {
+  const badge = document.getElementById('judge-invert-badge');
+  if (!badge) return;
+  badge.className = enabled ? 'on' : 'off';
+  badge.textContent = enabled ? '反転ON' : '反転OFF';
+}
+
+function applyLockDarknessUI(value) {
+  const slider = document.getElementById('lock-darkness-slider');
+  const label  = document.getElementById('lock-darkness-value');
+  if (slider) slider.value = value;
+  if (label)  label.textContent = value + '%';
+}
+
+document.getElementById('lock-darkness-slider').addEventListener('input', (e) => {
+  const v = parseInt(e.target.value);
+  document.getElementById('lock-darkness-value').textContent = v + '%';
+  localStorage.setItem('lockDarkness', String(v));
+  socket.emit('host-set-lock-darkness', { value: v });
+});
+
+document.getElementById('chk-judge-color-mode').addEventListener('change', (e) => {
+  judgeColorMode = e.target.checked;
+  localStorage.setItem('judgeColorMode', judgeColorMode ? '1' : '0');
+  updateJudgeInvertBadge(judgeColorMode);
+  socket.emit('host-set-judge-color-mode', { enabled: judgeColorMode });
+});
+// タブ切り替え
+document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.settings-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.settings-tab-pane').forEach(p => p.classList.remove('active'));
+    this.classList.add('active');
+    document.getElementById(this.dataset.tab).classList.add('active');
+    // レイアウトタブを開いた時は毎回再構築
+    if (this.dataset.tab === 'tab-layout') {
+      buildLayoutPresets();
+      buildLayoutEditorGrid();
+      if (layoutMode === 'free') { buildFreeEditor(); buildFreeSaveSlots(); loadBgPicker(); }
+    }
+    // ラベルタブを開いた時にスナップショット保存
+    if (this.dataset.tab === 'tab-label') {
+      _lblSnapshot = hostLabelConfig ? JSON.parse(JSON.stringify(hostLabelConfig)) : null;
+    }
+  });
+});
+
+// ── 名簿読込（設定内 btn-roster-load は既存ハンドラが対応） ──────────
+
+// ── ラベル設定（リアルタイムプレビュー） ──────────────────────────────
+let _lblSnapshot = null;
+
+function _getLabelConfig() {
+  const bgHex     = document.getElementById('lbl-bgcolor').value;
+  const bgOpacity = parseInt(document.getElementById('lbl-bgopacity').value) / 100;
+  const r = parseInt(bgHex.slice(1, 3), 16);
+  const g = parseInt(bgHex.slice(3, 5), 16);
+  const b = parseInt(bgHex.slice(5, 7), 16);
+  return {
+    enabled:       document.getElementById('lbl-enabled').checked,
+    fontSize:      parseInt(document.getElementById('lbl-fontsize').value),
+    fontFamily:    document.getElementById('lbl-fontfamily').value,
+    bold:          document.getElementById('lbl-bold').classList.contains('active'),
+    italic:        document.getElementById('lbl-italic').classList.contains('active'),
+    x:             parseInt(document.getElementById('lbl-x').value),
+    y:             parseInt(document.getElementById('lbl-y').value),
+    textAlign:     document.querySelector('.lbl-align-btn.active')?.dataset.align || 'left',
+    color:         document.getElementById('lbl-color').value,
+    bgColor:       `rgba(${r},${g},${b},${bgOpacity})`,
+    bgPadding:     parseInt(document.getElementById('lbl-bgpadding').value),
+    shadowEnabled: document.getElementById('lbl-shadow').checked,
+    shadowColor:   document.getElementById('lbl-shadowcolor').value,
+    shadowBlur:    parseInt(document.getElementById('lbl-shadowblur').value),
+    shadowOffsetX: parseInt(document.getElementById('lbl-shadowx').value),
+    shadowOffsetY: parseInt(document.getElementById('lbl-shadowy').value),
+  };
+}
+
+function _applyConfigToLabelUI(cfg) {
+  if (!cfg) return;
+  document.getElementById('lbl-enabled').checked = !!cfg.enabled;
+  if (cfg.fontSize) { document.getElementById('lbl-fontsize').value = cfg.fontSize; document.getElementById('lbl-fontsize-val').textContent = cfg.fontSize + 'px'; }
+  if (cfg.fontFamily) document.getElementById('lbl-fontfamily').value = cfg.fontFamily;
+  document.getElementById('lbl-bold').classList.toggle('active', !!cfg.bold);
+  document.getElementById('lbl-italic').classList.toggle('active', !!cfg.italic);
+  if (typeof cfg.x !== 'undefined') { document.getElementById('lbl-x').value = cfg.x; document.getElementById('lbl-x-val').textContent = cfg.x + '%'; }
+  if (typeof cfg.y !== 'undefined') { document.getElementById('lbl-y').value = cfg.y; document.getElementById('lbl-y-val').textContent = cfg.y + '%'; }
+  if (cfg.textAlign) document.querySelectorAll('.lbl-align-btn').forEach(b => b.classList.toggle('active', b.dataset.align === cfg.textAlign));
+  if (cfg.color) document.getElementById('lbl-color').value = cfg.color;
+  if (cfg.bgColor) {
+    const m = cfg.bgColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+    if (m) {
+      const hex = '#' + [m[1],m[2],m[3]].map(n => parseInt(n).toString(16).padStart(2,'0')).join('');
+      document.getElementById('lbl-bgcolor').value = hex;
+      const op = Math.round((parseFloat(m[4] ?? 1)) * 100);
+      document.getElementById('lbl-bgopacity').value = op;
+      document.getElementById('lbl-bgopacity-val').textContent = op + '%';
+    }
+  }
+  if (typeof cfg.bgPadding !== 'undefined') { document.getElementById('lbl-bgpadding').value = cfg.bgPadding; document.getElementById('lbl-bgpadding-val').textContent = cfg.bgPadding + 'px'; }
+  document.getElementById('lbl-shadow').checked = !!cfg.shadowEnabled;
+  document.getElementById('lbl-shadow-opts').classList.toggle('hidden', !cfg.shadowEnabled);
+  if (cfg.shadowColor) document.getElementById('lbl-shadowcolor').value = cfg.shadowColor;
+  if (typeof cfg.shadowBlur !== 'undefined') { document.getElementById('lbl-shadowblur').value = cfg.shadowBlur; document.getElementById('lbl-shadowblur-val').textContent = cfg.shadowBlur + 'px'; }
+  if (typeof cfg.shadowOffsetX !== 'undefined') { document.getElementById('lbl-shadowx').value = cfg.shadowOffsetX; document.getElementById('lbl-shadowx-val').textContent = cfg.shadowOffsetX + 'px'; }
+  if (typeof cfg.shadowOffsetY !== 'undefined') { document.getElementById('lbl-shadowy').value = cfg.shadowOffsetY; document.getElementById('lbl-shadowy-val').textContent = cfg.shadowOffsetY + 'px'; }
+}
+
+function _applyLabelLive() {
+  const config = _getLabelConfig();
+  hostLabelConfig = config;
+  applyAllHostLabels();
+  socket.emit('host-set-label-config', config);
+  localStorage.setItem('labelConfig', JSON.stringify(config));
+}
+
+// スライダー値表示 + リアルタイム適用
+const _lblSliders = [
+  ['lbl-fontsize',   'lbl-fontsize-val',   'px'],
+  ['lbl-x',          'lbl-x-val',          '%'],
+  ['lbl-y',          'lbl-y-val',          '%'],
+  ['lbl-bgopacity',  'lbl-bgopacity-val',  '%'],
+  ['lbl-bgpadding',  'lbl-bgpadding-val',  'px'],
+  ['lbl-shadowblur', 'lbl-shadowblur-val', 'px'],
+  ['lbl-shadowx',    'lbl-shadowx-val',    'px'],
+  ['lbl-shadowy',    'lbl-shadowy-val',    'px'],
+];
+for (const [id, valId, unit] of _lblSliders) {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => {
+    document.getElementById(valId).textContent = el.value + unit;
+    _applyLabelLive();
+  });
+}
+
+// チェック・セレクト・カラー系
+['lbl-enabled', 'lbl-color', 'lbl-bgcolor', 'lbl-shadowcolor', 'lbl-fontfamily'].forEach(id => {
+  document.getElementById(id).addEventListener('change', _applyLabelLive);
+});
+
+// 太字・斜体
+document.getElementById('lbl-bold').addEventListener('click', function() {
+  this.classList.toggle('active');
+  _applyLabelLive();
+});
+document.getElementById('lbl-italic').addEventListener('click', function() {
+  this.classList.toggle('active');
+  _applyLabelLive();
+});
+
+// 揃えボタン
+document.querySelectorAll('.lbl-align-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.lbl-align-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    _applyLabelLive();
+  });
+});
+
+// 影チェックボックス
+document.getElementById('lbl-shadow').addEventListener('change', function() {
+  document.getElementById('lbl-shadow-opts').classList.toggle('hidden', !this.checked);
+  _applyLabelLive();
+});
+
+// キャンセル
+document.getElementById('label-cancel-btn').addEventListener('click', () => {
+  if (_lblSnapshot) {
+    _applyConfigToLabelUI(_lblSnapshot);
+    hostLabelConfig = _lblSnapshot;
+    applyAllHostLabels();
+    socket.emit('host-set-label-config', _lblSnapshot);
+  }
+});
+
+// 決定
+document.getElementById('label-confirm-btn').addEventListener('click', () => {
+  _applyLabelLive();
+  _lblSnapshot = JSON.parse(JSON.stringify(hostLabelConfig));
+  const btn = document.getElementById('label-confirm-btn');
+  const orig = btn.textContent;
+  btn.textContent = '✓ 保存しました';
+  btn.disabled = true;
+  setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+});
+
+// カスタム確認ダイアログ（confirm()はElectronでキーボードフォーカスを失う問題があるため使わない）
+(function() {
+  const overlay = document.getElementById('host-confirm-overlay');
+  const msgEl   = document.getElementById('host-confirm-msg');
+  const yesBtn  = document.getElementById('host-confirm-yes');
+  const noBtn   = document.getElementById('host-confirm-no');
+  let _resolve  = null;
+  window.hostConfirm = function(message, type, onYes) {
+    msgEl.textContent = message;
+    if (type === 'delete') {
+      yesBtn.style.background = 'linear-gradient(180deg,#dc2626,#b91c1c)';
+      yesBtn.style.color = '#fff';
+    } else {
+      yesBtn.style.background = 'linear-gradient(180deg,#059669,#047857)';
+      yesBtn.style.color = '#fff';
+    }
+    overlay.classList.add('show');
+    _resolve = onYes;
+  };
+  yesBtn.addEventListener('click', () => {
+    overlay.classList.remove('show');
+    if (_resolve) { _resolve(); _resolve = null; }
+  });
+  noBtn.addEventListener('click', () => {
+    overlay.classList.remove('show');
+    _resolve = null;
+  });
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) { overlay.classList.remove('show'); _resolve = null; }
+  });
+})();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>KakiMoni - 子機セカンド（大型モニター）</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0d0d1a; color: #eee; font-family: 'Montserrat', sans-serif;
+         overflow: hidden; width: 100vw; height: 100vh; }
+
+  /* ── 設定モーダル ─────────────────────────── */
+  #setup-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.95);
+    display: flex; align-items: center; justify-content: center; z-index: 1000;
+  }
+  .setup-box {
+    background: #1e1e2e; border: 2px solid #4a4a8a; border-radius: 20px;
+    padding: 40px; width: 90%; max-width: 420px; text-align: center;
+  }
+  .setup-box h2 { color: #a78bfa; margin-bottom: 30px; font-size: 1.6rem; }
+  .setup-box label { display: block; text-align: left; margin-bottom: 6px;
+                     color: #aaa; font-size: 0.95rem; }
+  .setup-box select, .setup-box input {
+    width: 100%; padding: 12px 16px; border-radius: 10px;
+    background: #2d2d4a; border: 2px solid #4a4a8a; color: #eee;
+    font-size: 1.1rem; margin-bottom: 20px; outline: none;
+  }
+  .setup-box button {
+    width: 100%; padding: 14px; background: #7c3aed; border: none;
+    border-radius: 12px; color: #fff; font-size: 1.2rem; cursor: pointer;
+    margin-bottom: 10px;
+  }
+  .setup-box button:last-child { margin-bottom: 0; }
+  #btn-ext-display {
+    background: #0e7490 !important;
+    font-size: 1rem !important;
+  }
+  #btn-ext-display:hover { background: #0891b2 !important; }
+  #btn-ext-display.unsupported { background: #374151 !important; color: #6b7280 !important; cursor: not-allowed !important; }
+
+  /* ── メイン ─────────────────────────────── */
+  #main { display: none; width: 100vw; height: 100vh; position: relative; }
+
+  /* キャンバスエリア */
+  #canvas-wrap {
+    position: absolute; inset: 0;
+    overflow: hidden;
+    background-color: #fff;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+  #display-canvas {
+    position: absolute; top: 0; left: 0;
+  }
+
+  /* フタ（カバーパネル） */
+  #cover {
+    position: absolute; inset: 0; z-index: 30;
+    background-color: #0d1b2a;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    display: flex; align-items: center; justify-content: center;
+    will-change: transform, opacity;
+  }
+  /* ロゴなしのときのフォールバックテキスト */
+  #cover-label {
+    font-size: 3rem; color: rgba(96,165,250,0.4); font-weight: bold;
+    letter-spacing: 0.15em; user-select: none;
+  }
+  #cover-label.hidden { display: none; }
+
+  /* ── アニメーション定義 ──────────────────── */
+
+  /* slide-up: フタが上に滑り上がる */
+  #cover.anim-slide-up {
+    animation: slideUp 1.0s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+  @keyframes slideUp {
+    0%   { transform: translateY(0%); }
+    100% { transform: translateY(-105%); }
+  }
+
+  /* slide-down */
+  #cover.anim-slide-down {
+    animation: slideDown 1.0s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+  @keyframes slideDown {
+    0%   { transform: translateY(0%); }
+    100% { transform: translateY(105%); }
+  }
+
+  /* slide-left */
+  #cover.anim-slide-left {
+    animation: slideLeft 1.0s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+  @keyframes slideLeft {
+    0%   { transform: translateX(0%); }
+    100% { transform: translateX(-105%); }
+  }
+
+  /* slide-right */
+  #cover.anim-slide-right {
+    animation: slideRight 1.0s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+  @keyframes slideRight {
+    0%   { transform: translateX(0%); }
+    100% { transform: translateX(105%); }
+  }
+
+  /* flip: 横回転でカードめくり */
+  #canvas-wrap.perspective { perspective: 1200px; }
+  #cover.anim-flip {
+    transform-origin: center center;
+    animation: flipAway 0.9s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    backface-visibility: hidden;
+  }
+  @keyframes flipAway {
+    0%   { transform: rotateY(0deg); opacity: 1; }
+    50%  { transform: rotateY(90deg); opacity: 0.5; }
+    100% { transform: rotateY(90deg); opacity: 0; display: none; }
+  }
+
+  /* fade */
+  #cover.anim-fade {
+    animation: fadeOut 1.2s ease-in-out forwards;
+  }
+  @keyframes fadeOut {
+    0%   { opacity: 1; }
+    100% { opacity: 0; pointer-events: none; }
+  }
+
+  /* zoom-in: 中心から拡大してはじける */
+  #cover.anim-zoom {
+    animation: zoomOut 0.7s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+  @keyframes zoomOut {
+    0%   { transform: scale(1); opacity: 1; }
+    70%  { transform: scale(1.05); opacity: 0.7; }
+    100% { transform: scale(5); opacity: 0; }
+  }
+
+  /* split: 上下に分割して開く（2パネル） */
+  #cover-top, #cover-bottom {
+    position: absolute; left: 0; right: 0; height: 50%; z-index: 30;
+    background-color: #0d1b2a;
+    background-size: cover;
+    background-position: center top;    /* topは上半分 */
+    background-repeat: no-repeat;
+    display: none;
+  }
+  #cover-top    { top: 0; background-position: center top; }
+  #cover-bottom { bottom: 0; background-position: center bottom; }
+  #cover-top.anim-split    { display: block; animation: splitUp   1.0s cubic-bezier(0.4,0,0.2,1) forwards; }
+  #cover-bottom.anim-split { display: block; animation: splitDown 1.0s cubic-bezier(0.4,0,0.2,1) forwards; }
+  @keyframes splitUp   { to { transform: translateY(-105%); } }
+  @keyframes splitDown { to { transform: translateY(105%);  } }
+
+  /* 正解／不正解 オーバーレイ */
+  #result-overlay {
+    position: absolute; inset: 0; z-index: 30;
+    display: none; align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  #result-overlay.show { display: flex; }
+  #result-overlay img {
+    max-width: 70%; max-height: 70%;
+    object-fit: contain;
+    animation: resultPop 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards;
+  }
+  @keyframes resultPop {
+    0%   { transform: scale(0.5); opacity: 0; }
+    100% { transform: scale(1);   opacity: 1; }
+  }
+
+  /* 選択肢レイヤー */
+  #choice-layer {
+    position: absolute; inset: 0;
+    display: none;
+    pointer-events: none;
+  }
+  #choice-layer.show { display: flex; align-items: center; justify-content: center; }
+  #choice-layer img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+  }
+
+  /* ── 名前ラベル ────────────────────── */
+  #seat-label {
+    display: none;
+    position: absolute;
+    pointer-events: none;
+    z-index: 25;
+    white-space: nowrap;
+    line-height: 1.3;
+    border-radius: 3px;
+  }
+
+</style>
+</head>
+<body>
+
+<!-- 設定モーダル -->
+<div id="setup-modal">
+  <div class="setup-box">
+    <h2>🪟 KakiMoni 子機セカンド</h2>
+    <label for="input-seat">席番号（子機と同じ番号を選択）</label>
+    <select id="input-seat">
+      <option value="1">1番席</option>
+      <option value="2">2番席</option>
+      <option value="3">3番席</option>
+      <option value="4">4番席</option>
+      <option value="5">5番席</option>
+      <option value="6">6番席</option>
+      <option value="7">7番席</option>
+      <option value="8">8番席</option>
+      <option value="9">9番席</option>
+      <option value="10">10番席</option>
+    </select>
+    <button id="btn-start">接続</button>
+    <button id="btn-ext-display">拡張画面で開く＆接続</button>
+  </div>
+</div>
+
+<!-- メイン -->
+<div id="main">
+  <div id="canvas-wrap">
+    <!-- 選択肢レイヤー（描画キャンバスの下） -->
+    <div id="choice-layer"><img id="choice-img" src="" alt=""></div>
+    <canvas id="display-canvas"></canvas>
+    <!-- スプリットアニメーション用 -->
+    <div id="cover-top"></div>
+    <div id="cover-bottom"></div>
+    <!-- メインカバー -->
+    <div id="cover">
+      <div id="cover-label">READY</div>
+    </div>
+    <!-- 名前ラベル -->
+    <div id="seat-label"></div>
+  </div>
+  <!-- 正解／不正解 オーバーレイ -->
+  <div id="result-overlay"><img id="result-img" src="" alt=""></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+let seatId   = null;
+let socket   = null;
+let revealed = false;
+
+// ====================================================
+// 外部ディスプレイで開く
+// ====================================================
+(function () {
+  const btn = document.getElementById('btn-ext-display');
+  if (!('getScreenDetails' in window)) {
+    btn.textContent = '拡張画面非対応（接続のみ）';
+    btn.classList.add('unsupported');
+    btn.addEventListener('click', () => document.getElementById('btn-start').click());
+    return;
+  }
+  btn.addEventListener('click', async () => {
+    let screenDetails;
+    try {
+      screenDetails = await window.getScreenDetails();
+    } catch (e) {
+      alert('画面管理の許可が必要です。ブラウザの許可ダイアログで「許可」を選んでください。');
+      return;
+    }
+    const screens = screenDetails.screens;
+    const target = screens.find(s => !s.isPrimary) || screens[screens.length - 1];
+    const popup = window.open(
+      location.href,
+      'client-display-ext',
+      `left=${target.left},top=${target.top},width=${target.width},height=${target.height},toolbar=0,menubar=0,scrollbars=0`
+    );
+    if (!popup) {
+      alert('ポップアップがブロックされました。ブラウザの設定でこのサイトのポップアップを許可してください。');
+      return;
+    }
+    popup.addEventListener('load', () => {
+      try { popup.document.documentElement.requestFullscreen(); } catch (_) {}
+    });
+    // 元のウィンドウは接続しないまま閉じる
+    window.close();
+  });
+})();
+
+const setupModal  = document.getElementById('setup-modal');
+const main        = document.getElementById('main');
+const wrap        = document.getElementById('canvas-wrap');
+const canvas      = document.getElementById('display-canvas');
+const ctx           = canvas.getContext('2d');
+const strokeHistory = [];
+let liveStroke = null; // 描画中ストローク
+let bgImageUrl = '';
+let fillImageUrl = '';
+let judgeColorMode = false;
+let labelConfig = null;
+let labelName   = '';
+
+function applyLabelDisplay() {
+  const el = document.getElementById('seat-label');
+  if (!el || !labelConfig) return;
+  if (!labelConfig.enabled || !labelName || !revealed) {
+    el.style.display = 'none';
+    return;
+  }
+  el.textContent = labelName;
+  el.style.display = 'block';
+  el.style.left = labelConfig.x + '%';
+  el.style.top  = labelConfig.y + '%';
+  const align = labelConfig.textAlign || 'left';
+  el.style.transform = align === 'center' ? 'translateX(-50%)'
+                     : align === 'right'  ? 'translateX(-100%)' : 'none';
+  el.style.textAlign   = align;
+  el.style.fontSize    = labelConfig.fontSize + 'px';
+  el.style.fontFamily  = labelConfig.fontFamily;
+  el.style.fontWeight  = labelConfig.bold   ? 'bold'   : 'normal';
+  el.style.fontStyle   = labelConfig.italic ? 'italic' : 'normal';
+  el.style.color       = labelConfig.color;
+  const bg = labelConfig.bgColor || 'rgba(0,0,0,0)';
+  const isTransparent  = bg === 'rgba(0,0,0,0)' || bg === 'rgba(0,0,0,0.00)' || bg.endsWith(',0)');
+  el.style.backgroundColor = bg;
+  el.style.padding = isTransparent ? '0' : labelConfig.bgPadding + 'px';
+  if (labelConfig.shadowEnabled) {
+    const { shadowOffsetX: ox, shadowOffsetY: oy, shadowBlur: bl, shadowColor: sc } = labelConfig;
+    el.style.textShadow = `${ox}px ${oy}px ${bl}px ${sc}`;
+  } else {
+    el.style.textShadow = '';
+  }
+}
+
+const cover       = document.getElementById('cover');
+const coverTop    = document.getElementById('cover-top');
+const coverBottom = document.getElementById('cover-bottom');
+
+document.getElementById('btn-start').addEventListener('click', () => {
+  seatId = document.getElementById('input-seat').value;
+  setupModal.style.display = 'none';
+  main.style.display = 'block';
+  initCanvas();
+  connectSocket();
+});
+
+// URLパラメータに ?seat=N があれば自動スタート
+(function() {
+  const params = new URLSearchParams(location.search);
+  const s = params.get('seat');
+  if (s) {
+    const sel = document.getElementById('input-seat');
+    sel.value = s;
+    document.getElementById('btn-start').click();
+  }
+  if (params.get('autoFullscreen') === '1') {
+    // フルスクリーン誘導オーバーレイを表示
+    const overlay = document.createElement('div');
+    overlay.id = 'fs-overlay';
+    overlay.style.cssText = `
+      position:fixed;inset:0;z-index:99999;
+      background:rgba(0,0,0,0.85);
+      display:flex;align-items:center;justify-content:center;
+      cursor:pointer;
+    `;
+    overlay.innerHTML = `<div style="color:#fff;font-size:2rem;text-align:center;pointer-events:none;">
+      タップしてフルスクリーン
+    </div>`;
+    overlay.addEventListener('click', () => {
+      document.documentElement.requestFullscreen().catch(() => {});
+      overlay.remove();
+    }, { once: true });
+    // DOM構築後に追加
+    const addOverlay = () => document.body.appendChild(overlay);
+    if (document.body) addOverlay();
+    else document.addEventListener('DOMContentLoaded', addOverlay);
+  }
+})();
+
+// ====================================================
+// Canvas 描画
+// ====================================================
+
+function initCanvas() {
+  resizeCanvas();
+  window.addEventListener('resize', () => { resizeCanvas(); });
+}
+
+function resizeCanvas() {
+  const { width, height } = wrap.getBoundingClientRect();
+  const r = window.devicePixelRatio || 1;
+  canvas.width  = Math.floor(width  * r);
+  canvas.height = Math.floor(height * r);
+  canvas.style.width  = width  + 'px';
+  canvas.style.height = height + 'px';
+  ctx.scale(r, r);
+  redrawAll();
+}
+
+function updateCanvasWrapBg() {
+  if (fillImageUrl && bgImageUrl) {
+    wrap.style.backgroundImage = `url('${bgImageUrl}'), url('${fillImageUrl}')`;
+    wrap.style.backgroundSize = 'cover, 100% 100%';
+  } else if (fillImageUrl) {
+    wrap.style.backgroundImage = `url('${fillImageUrl}')`;
+    wrap.style.backgroundSize = '100% 100%';
+  } else if (bgImageUrl) {
+    wrap.style.backgroundImage = `url('${bgImageUrl}')`;
+    wrap.style.backgroundSize = 'cover';
+  } else {
+    wrap.style.backgroundImage = '';
+    wrap.style.backgroundSize = '';
+  }
+}
+
+function setBgImage(url) {
+  const newUrl = url || '';
+  if (newUrl === bgImageUrl) return;
+  bgImageUrl = newUrl;
+  updateCanvasWrapBg();
+}
+
+function redrawAll() {
+  const w = canvas.width  / (window.devicePixelRatio || 1);
+  const h = canvas.height / (window.devicePixelRatio || 1);
+  ctx.clearRect(0, 0, w, h);
+  for (const stroke of strokeHistory) drawStroke(stroke);
+}
+
+function invertColor(hex) {
+  if (!hex || hex[0] !== '#' || hex.length !== 7) return hex;
+  const r = 255 - parseInt(hex.slice(1, 3), 16);
+  const g = 255 - parseInt(hex.slice(3, 5), 16);
+  const b = 255 - parseInt(hex.slice(5, 7), 16);
+  return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+// 座標スケール比を返す（子機の srcW/srcH → 当画面のキャンバスサイズに変換）
+function getStrokeScale(stroke) {
+  const dw = canvas.width  / (window.devicePixelRatio || 1);
+  const dh = canvas.height / (window.devicePixelRatio || 1);
+  const sx = (stroke.srcW && stroke.srcW > 0) ? dw / stroke.srcW : 1;
+  const sy = (stroke.srcH && stroke.srcH > 0) ? dh / stroke.srcH : 1;
+  return { sx, sy };
+}
+
+// 描画中の差分描画（リアルタイム用）
+function drawStrokeSegment(stroke) {
+  const pts = stroke.points;
+  if (pts.length < 2) return;
+  const { sx, sy } = getStrokeScale(stroke);
+  ctx.save();
+  ctx.scale(sx, sy);
+  if (stroke.tool === 'eraser') {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.strokeStyle = 'rgba(0,0,0,1)';
+  } else {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = (judgeColorMode && fillImageUrl) ? invertColor(stroke.color) : stroke.color;
+  }
+  ctx.lineWidth = stroke.size;
+  ctx.lineCap   = 'round';
+  ctx.lineJoin  = 'round';
+  ctx.beginPath();
+  if (pts.length === 2) {
+    ctx.moveTo(pts[0].x, pts[0].y);
+    ctx.lineTo(pts[1].x, pts[1].y);
+  } else {
+    const pprev = pts[pts.length - 3];
+    const prev  = pts[pts.length - 2];
+    const curr  = pts[pts.length - 1];
+    ctx.moveTo((pprev.x + prev.x) / 2, (pprev.y + prev.y) / 2);
+    ctx.quadraticCurveTo(prev.x, prev.y, (prev.x + curr.x) / 2, (prev.y + curr.y) / 2);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawStroke(stroke) {
+  if (!stroke.points || stroke.points.length < 1) return;
+  const { sx, sy } = getStrokeScale(stroke);
+  ctx.save();
+  ctx.scale(sx, sy);
+  if (stroke.tool === 'eraser') {
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.strokeStyle = 'rgba(0,0,0,1)';
+  } else {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = (judgeColorMode && fillImageUrl) ? invertColor(stroke.color) : stroke.color;
+  }
+  ctx.lineWidth = stroke.size;
+  ctx.lineCap   = 'round';
+  ctx.lineJoin  = 'round';
+  ctx.beginPath();
+  ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+  for (let i = 1; i < stroke.points.length; i++) {
+    const prev = stroke.points[i - 1];
+    const curr = stroke.points[i];
+    ctx.quadraticCurveTo(prev.x, prev.y, (prev.x + curr.x) / 2, (prev.y + curr.y) / 2);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// リアルタイムストローク追加
+function addStroke(stroke) {
+  strokeHistory.push(stroke);
+  drawStroke(stroke);
+}
+
+// ロゴ読み込み
+let logoUrl = '';
+async function loadLogo() {
+  // URLパラメータに ?logo= があればそれを優先使用
+  const params = new URLSearchParams(location.search);
+  const logoParam = params.get('logo');
+  if (logoParam) {
+    logoUrl = logoParam;
+    applyLogoToCovers(logoUrl);
+    document.getElementById('cover-label').classList.add('hidden');
+    return;
+  }
+  // なければサーバーのデフォルトロゴを取得
+  try {
+    const data = await fetch('/api/logo').then(r => r.json());
+    if (data.url) {
+      logoUrl = data.url;
+      applyLogoToCovers(logoUrl);
+      document.getElementById('cover-label').classList.add('hidden');
+    }
+  } catch {}
+}
+
+function applyLogoToCovers(url) {
+  const bgVal = `url('${url}')`;
+  cover.style.backgroundImage = bgVal;
+  // split用：上下パネルが合わさって元画像になるよう
+  // 200%高でセット → topパネルは上半分、bottomパネルは下半分を表示
+  coverTop.style.backgroundImage    = bgVal;
+  coverTop.style.backgroundSize     = '100% 200%';
+  coverTop.style.backgroundPosition = 'center top';
+  coverBottom.style.backgroundImage    = bgVal;
+  coverBottom.style.backgroundSize     = '100% 200%';
+  coverBottom.style.backgroundPosition = 'center bottom';
+}
+loadLogo();
+
+// オーバーレイ
+const resultOverlay = document.getElementById('result-overlay');
+const resultImg     = document.getElementById('result-img');
+
+function showOverlay(imageUrl) {
+  const isFill = /fill/i.test(imageUrl.split('/').pop());
+  if (isFill) {
+    fillImageUrl = imageUrl;
+    updateCanvasWrapBg();
+    resultOverlay.classList.remove('show');
+    resultImg.src = '';
+  } else {
+    fillImageUrl = '';
+    updateCanvasWrapBg();
+    resultImg.src = imageUrl;
+    resultImg.className = '';
+    resultOverlay.classList.add('show');
+  }
+}
+function clearOverlay() {
+  resultOverlay.classList.remove('show');
+  resultImg.src = '';
+  fillImageUrl = '';
+  updateCanvasWrapBg();
+}
+
+// ====================================================
+// フタ開閉アニメーション
+// ====================================================
+function showCover() {
+  cover.className     = '';
+  coverTop.className  = '';
+  coverBottom.className = '';
+  cover.style.display   = 'flex';
+  cover.style.opacity   = '1';
+  cover.style.transform = 'none';
+  // バックグラウンド画像を再適用（cssText上書き防止）
+  if (logoUrl) applyLogoToCovers(logoUrl);
+  coverTop.style.display    = 'none';
+  coverBottom.style.display = 'none';
+  revealed = false;
+  applyLabelDisplay();
+}
+
+function doReveal(animType) {
+  if (revealed) return;
+  revealed = true;
+
+  if (animType === 'cut') {
+    // カット：即座に消える
+    cover.style.display       = 'none';
+    coverTop.style.display    = 'none';
+    coverBottom.style.display = 'none';
+  } else if (animType === 'split') {
+    // スプリット：上下2パネル
+    cover.style.display = 'none';
+    coverTop.className    = 'anim-split';
+    coverBottom.className = 'anim-split';
+    setTimeout(() => {
+      coverTop.style.display    = 'none';
+      coverBottom.style.display = 'none';
+    }, 1100);
+  } else {
+    const classMap = {
+      'slide-up':    'anim-slide-up',
+      'slide-down':  'anim-slide-down',
+      'slide-left':  'anim-slide-left',
+      'slide-right': 'anim-slide-right',
+      'flip':        'anim-flip',
+      'fade':        'anim-fade',
+      'zoom':        'anim-zoom',
+    };
+    cover.className = classMap[animType] || 'anim-slide-up';
+    setTimeout(() => { cover.style.display = 'none'; }, 1200);
+  }
+  applyLabelDisplay();
+}
+
+// ====================================================
+// Socket.io
+// ====================================================
+function connectSocket() {
+  socket = io();
+
+  socket.on('connect', () => {
+    socket.emit('register-client-display', { seatId });
+  });
+
+  socket.on('disconnect', () => {
+    // 切断時の処理
+  });
+
+  // ストローク復元
+  socket.on('restore-strokes', (strokes) => {
+    strokeHistory.length = 0;
+    for (const s of strokes) strokeHistory.push(s);
+    redrawAll();
+  });
+  // リアルタイム描画（指を魚いたタイミング）
+  socket.on('stroke-start', (stroke) => {
+    liveStroke = stroke;
+    drawStroke(stroke); // 最初の1点を描画
+  });
+
+  socket.on('stroke-point', (point) => {
+    if (!liveStroke) return;
+    liveStroke.points.push(point);
+    drawStrokeSegment(liveStroke);
+  });
+
+  socket.on('stroke-end', () => {
+    if (liveStroke) {
+      strokeHistory.push(liveStroke);
+      liveStroke = null;
+    }
+  });
+
+  // クリア
+  socket.on('clear', ({ cover } = {}) => {
+    strokeHistory.length = 0;
+    redrawAll();
+    clearOverlay();
+    clearChoice();
+    if (cover) showCover();
+  });
+
+  // 描画のみクリア（判定は残す）
+  socket.on('clear-strokes-only', () => {
+    strokeHistory.length = 0;
+    redrawAll();
+  });
+
+  // 回答オープン
+  socket.on('reveal', ({ animType }) => {
+    doReveal(animType || 'slide-up');
+  });
+
+  // フタ閉じ
+  socket.on('hide', () => {
+    showCover();
+    clearOverlay();
+  });
+
+  // 問題更新
+  socket.on('question-updated', ({ question }) => {
+    // バナー非表示のため何もしない（必要なら追加）
+  });
+
+  // 背景変更
+  socket.on('bg-changed', ({ bgImageUrl: url }) => {
+    setBgImage(url);
+  });
+
+  // 正解・不正解オーバーレイ
+  socket.on('show-overlay', ({ imageUrl }) => {
+    if (imageUrl) { showOverlay(imageUrl); redrawAll(); }
+  });
+  socket.on('clear-overlay', () => {
+    clearOverlay(); redrawAll();
+  });
+  socket.on('judge-color-mode', ({ enabled }) => {
+    judgeColorMode = enabled;
+    redrawAll();
+  });
+
+  // 選択肢画像
+  const choiceLayer = document.getElementById('choice-layer');
+  const choiceImg   = document.getElementById('choice-img');
+  function showChoice(url) {
+    choiceImg.src = url;
+    choiceLayer.classList.add('show');
+  }
+  function clearChoice() {
+    choiceLayer.classList.remove('show');
+    choiceImg.src = '';
+  }
+  socket.on('show-choice', ({ imageUrl }) => {
+    if (imageUrl) showChoice(imageUrl); else clearChoice();
+  });
+  socket.on('clear-choice', () => { clearChoice(); });
+
+  // 状態同期（初回接続時）
+  socket.on('full-state', (state) => {
+    const seat = state.seats.find(s => String(s.seatId) === String(seatId));
+    if (seat) {
+      setBgImage(seat.bgImageUrl || '');
+      strokeHistory.length = 0;
+      for (const s of (seat.strokes || [])) strokeHistory.push(s);
+      redrawAll();
+      if (seat.revealed) {
+        doReveal(seat.animType || 'slide-up');
+      } else {
+        showCover();
+      }
+    }
+    // 選択肢画像を復元
+    if (state.choiceImageUrl) showChoice(state.choiceImageUrl);
+    else clearChoice();
+  });
+
+  // ラベル設定
+  socket.on('label-config', (config) => {
+    labelConfig = config;
+    applyLabelDisplay();
+  });
+
+  // IDごとの名前更新
+  socket.on('seat-label-name', ({ name }) => {
+    labelName = name;
+    applyLabelDisplay();
+  });
+}
+</script>
+</body>
+</html>
