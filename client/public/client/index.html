@@ -419,10 +419,15 @@ let _cachedScreenDetails = null;
   const urlParam = params.get('serverUrl');
   if (urlParam) {
     document.getElementById('input-server-url').value = urlParam;
-    return;
+  } else {
+    const saved = localStorage.getItem('kakimoni_server_url');
+    if (saved) document.getElementById('input-server-url').value = saved;
   }
-  const saved = localStorage.getItem('kakimoni_server_url');
-  if (saved) document.getElementById('input-server-url').value = saved;
+
+  const savedSeat = localStorage.getItem('kakimoni_seat_id');
+  if (/^\d+$/.test(String(savedSeat || ''))) {
+    document.getElementById('input-seat').value = savedSeat;
+  }
 })();
 
 document.getElementById('btn-start').addEventListener('click', () => {
@@ -434,6 +439,7 @@ document.getElementById('btn-start').addEventListener('click', () => {
   serverUrl  = document.getElementById('input-server-url').value.trim().replace(/\/$/, '');
   localStorage.setItem('kakimoni_server_url', serverUrl);
   seatId     = document.getElementById('input-seat').value;
+  localStorage.setItem('kakimoni_seat_id', String(seatId));
   playerName = `ID ${seatId}`;
   setupModal.style.display = 'none';
   main.style.display = 'flex';
