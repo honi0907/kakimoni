@@ -928,12 +928,6 @@
     <span>Q: <input id="save-counter-input" type="number" min="0" max="9999" value="0" title="Q番号を直接入力してEnter"></span>
   </div>
     <div style="font-size:0.85rem; color:#6b7280;" id="host-url"></div>
-    <a id="gh-release-badge" href="https://github.com/honi0907/kakimoni-release/releases/latest"
-      target="_blank"
-      style="font-size:0.72rem; padding:3px 10px; border-radius:0;
-          background:#1e293b; border:1px solid #374151; color:#94a3b8;
-          text-decoration:none; white-space:nowrap; margin-left:8px;"
-      title="GitHubの最新リリースを開く">GitHub: 確認中...</a>
 </div>
 <div id="save-toast"></div>
 
@@ -2492,26 +2486,7 @@ document.getElementById('g-judge').addEventListener('click', () => {
 // ====================================================
 document.getElementById('host-url').textContent = `${location.host}`;
 
-// GitHub 最新リリース確認
-(async () => {
-  const badge = document.getElementById('gh-release-badge');
-  try {
-    const res = await fetch('https://api.github.com/repos/honi0907/kakimoni-release/releases/latest',
-      { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-cache' });
-    if (!res.ok) throw new Error(res.status);
-    const data = await res.json();
-    badge.textContent = `GitHub: ${data.tag_name}`;
-    badge.href = data.html_url;
-    badge.style.color = '#4ade80';
-    badge.style.borderColor = '#166534';
-    badge.style.background = '#052e16';
-  } catch (e) {
-    badge.textContent = 'GitHub: 取得失敗';
-    badge.style.color = '#ef4444';
-    badge.style.borderColor = '#7f1d1d';
-    badge.style.background = '#1a0000';
-  }
-})();
+
 
 buildSeatActionBoard();
 
