@@ -32,6 +32,14 @@
     background: #374151; color: #9ca3af;
   }
   #conn-indicator.ok { background: #065f46; color: var(--green); }
+  #app-version-badge {
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    border: 1px solid #334155;
+    background: #0b1324;
+    color: #93c5fd;
+    border-radius: 3px;
+  }
 
   /* ── セーブステータス ───────────────────── */
   #save-bar {
@@ -923,6 +931,7 @@
 <div id="topbar">
   <h1>KakiMoni 親機</h1>
   <div id="conn-indicator">▶ 接続中...</div>
+  <div id="app-version-badge">v-</div>
   <div id="save-bar">
     <span>Session: <input id="save-session-input" type="number" min="1" max="99" value="1" title="Session番号を直接入力してEnter"></span>
     <span>Q: <input id="save-counter-input" type="number" min="0" max="9999" value="0" title="Q番号を直接入力してEnter"></span>
@@ -2485,6 +2494,21 @@ document.getElementById('g-judge').addEventListener('click', () => {
 // 起動
 // ====================================================
 document.getElementById('host-url').textContent = `${location.host}`;
+
+(async () => {
+  const badge = document.getElementById('app-version-badge');
+  if (!badge) return;
+  try {
+    if (window.kmHost && typeof window.kmHost.getAppVersion === 'function') {
+      const v = await window.kmHost.getAppVersion();
+      badge.textContent = `v${v || '-'}`;
+      return;
+    }
+    badge.textContent = 'Web';
+  } catch {
+    badge.textContent = 'v?';
+  }
+})();
 
 
 

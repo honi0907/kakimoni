@@ -151,6 +151,14 @@
   }
   #seat-label { font-size: 1rem; color: #a78bfa; font-weight: bold;
                 min-width: 80px; white-space: nowrap; }
+  #app-version-badge {
+    font-size: 0.75rem;
+    color: #93c5fd;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 3px;
+    padding: 2px 8px;
+  }
 
   /* ツールバー */
   #toolbar {
@@ -408,6 +416,7 @@
   <div id="topbar">
     <div id="conn-dot" title="接続状態"></div>
     <span id="seat-label">ID -</span>
+    <span id="app-version-badge">v-</span>
     <span id="second-url-label" style="display:none; margin-left:auto; font-size:0.75rem; color:#aaa; user-select:all;"></span>
   </div>
   <div id="toolbar">
@@ -464,6 +473,21 @@ let isWritingBlackout = false;
 
 // 拡張画面情報を事前にキャッシュ
 let _cachedScreenDetails = null;
+
+(async () => {
+  const badge = document.getElementById('app-version-badge');
+  if (!badge) return;
+  try {
+    if (window.electronAPI && typeof window.electronAPI.getAppVersion === 'function') {
+      const v = await window.electronAPI.getAppVersion();
+      badge.textContent = `v${v || '-'}`;
+      return;
+    }
+    badge.textContent = 'Web';
+  } catch {
+    badge.textContent = 'v?';
+  }
+})();
 
 // サーバーURL入力欄の前回値を復元
 (function() {
