@@ -1,13 +1,15 @@
 param(
   [string]$OutputRoot = "dist-subserver",
-  [string]$Version = "1.0.0"
+  [string]$Version = "1.0.0",
+  [switch]$IncludeNodeModules
 )
 
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$packageName = "KakiMoni_SubServer-$Version"
+$mode = if ($IncludeNodeModules) { "Bundled" } else { "Lite" }
+$packageName = "KakiMoni_SubServer-$Version-$mode"
 $workDir = Join-Path $projectRoot $OutputRoot
 $packageDir = Join-Path $workDir $packageName
 $zipPath = Join-Path $workDir "$packageName-$stamp.zip"
@@ -42,14 +44,18 @@ foreach ($ch in @("client", "host", "layout")) {
 }
 
 Write-Host "[4/5] writing README..."
+$setupLine = if ($IncludeNodeModules) {
+  "2) Run: node server.js"
+} else {
+  "2) Run: npm install --omit=dev`r`n3) Run: node server.js"
+}
 $readme = @"
-KakiMoni SubServer Package ($Version)
+KakiMoni SubServer Package ($Version / $mode)
 
 This package is for failover operation on a layout PC.
 
 1) Open terminal in this folder.
-2) Run: npm install --omit=dev
-3) Run: node server.js
+$setupLine
 
 Default port: 3000
 If you want to change port:
@@ -63,6 +69,16 @@ Important:
 - Only use this as standby/failover server.
 "@
 Set-Content -Path (Join-Path $packageDir "README_SubServer.txt") -Value $readme -Encoding utf8
+
+if ($IncludeNodeModules) {
+  Write-Host "[4.5/5] installing production dependencies into package..."
+  Push-Location $packageDir
+  try {
+    npm install --omit=dev | Out-Host
+  } finally {
+    Pop-Location
+  }
+}
 
 Write-Host "[5/5] creating zip..."
 if (!(Test-Path $workDir)) {
