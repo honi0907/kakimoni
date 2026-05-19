@@ -6,7 +6,7 @@ const os = require('os');
 const fs = require('fs');
 
 const app = express();
-const PORT = 3000;
+const PORT = parseInt(process.env.KAKIMONI_PORT || '3000', 10) || 3000;
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
   maxHttpBufferSize: 5e6,
@@ -53,7 +53,50 @@ const state = {
   currentChoiceUrl: null,
   judgeColorMode: false,
   lockDarkness: 65,
+  // 同時運用中のホストUI情報
+  hostPanels: new Map(), // socketId -> { operatorName, uiType, connectedAt }
+  lastHostAction: null,
 };
+
+function sanitizeOperatorName(raw) {
+  const v = String(raw || '').trim();
+  if (!v) return 'host-operator';
+  return v.slice(0, 32);
+}
+
+function sanitizeUiType(raw) {
+  const v = String(raw || '').trim().toLowerCase();
+  if (v === 'electron' || v === 'web') return v;
+  return 'unknown';
+}
+
+function broadcastHostPanels() {
+  const panels = [];
+  for (const [socketId, info] of state.hostPanels.entries()) {
+    panels.push({ socketId, ...info });
+  }
+  panels.sort((a, b) => String(a.connectedAt).localeCompare(String(b.connectedAt)));
+  for (const id of state.hosts) io.to(id).emit('host-panels', { panels });
+}
+
+function trackHostAction(socket, action, detail = {}) {
+  if (socket.role !== 'host') return;
+  const panel = state.hostPanels.get(socket.id) || {
+    operatorName: 'host-operator',
+    uiType: 'unknown',
+    connectedAt: new Date().toISOString(),
+  };
+  const payload = {
+    action,
+    detail,
+    operatorName: panel.operatorName,
+    uiType: panel.uiType,
+    socketId: socket.id,
+    at: new Date().toISOString(),
+  };
+  state.lastHostAction = payload;
+  for (const id of state.hosts) io.to(id).emit('host-action-trace', payload);
+}
 
 // ============================================================
 // 静的ファイル配信
@@ -121,6 +164,60 @@ try {
 function persistSaveState() {
   fs.writeFileSync(saveStatePath, JSON.stringify(saveState));
 }
+
+const clientSettingsDir = path.join(savesDir, 'client_settings');
+if (!fs.existsSync(clientSettingsDir)) fs.mkdirSync(clientSettingsDir, { recursive: true });
+
+function normalizeSeatId(raw) {
+  const n = parseInt(String(raw || ''), 10);
+  if (!Number.isInteger(n) || n < 1 || n > 99) return null;
+  return n;
+}
+
+function clientSettingsPathBySeat(seatId) {
+  return path.join(clientSettingsDir, `ID${String(seatId).padStart(2, '0')}.json`);
+}
+
+app.get('/api/client-settings/:seatId', (req, res) => {
+  try {
+    const seatId = normalizeSeatId(req.params.seatId);
+    if (!seatId) return res.status(400).json({ ok: false, error: 'invalid seatId' });
+
+    const filePath = clientSettingsPathBySeat(seatId);
+    if (!fs.existsSync(filePath)) {
+      return res.json({ ok: true, seatId, settings: null });
+    }
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    return res.json({ ok: true, seatId, settings: data.settings || null, updatedAt: data.updatedAt || null });
+  } catch (e) {
+    console.error('[ClientSettings] load error', e);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+app.post('/api/client-settings/:seatId', express.json({ limit: '1mb' }), (req, res) => {
+  try {
+    const seatId = normalizeSeatId(req.params.seatId);
+    if (!seatId) return res.status(400).json({ ok: false, error: 'invalid seatId' });
+
+    const settings = req.body && req.body.settings;
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+      return res.status(400).json({ ok: false, error: 'invalid settings payload' });
+    }
+
+    const record = {
+      seatId,
+      updatedAt: new Date().toISOString(),
+      settings,
+    };
+    const filePath = clientSettingsPathBySeat(seatId);
+    fs.writeFileSync(filePath, JSON.stringify(record, null, 2), 'utf-8');
+    res.json({ ok: true, seatId, updatedAt: record.updatedAt });
+  } catch (e) {
+    console.error('[ClientSettings] save error', e);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
 
 // ============================================================
 // アプリアップデート配信 API
@@ -455,11 +552,18 @@ io.on('connection', (socket) => {
   });
 
   // 親機登録
-  socket.on('register-host', () => {
+  socket.on('register-host', (meta = {}) => {
     state.hosts.add(socket.id);
     socket.role = 'host';
+    state.hostPanels.set(socket.id, {
+      operatorName: sanitizeOperatorName(meta.operatorName),
+      uiType: sanitizeUiType(meta.uiType),
+      connectedAt: new Date().toISOString(),
+    });
     console.log(`[親機登録] ${socket.id}`);
     socket.emit('full-state', buildFullState());
+    if (state.lastHostAction) socket.emit('host-action-trace', state.lastHostAction);
+    broadcastHostPanels();
   });
 
   // 親機のセカンド登録
@@ -482,6 +586,7 @@ io.on('connection', (socket) => {
 
   // レイアウト設定（親機から）
   socket.on('display-layout', ({ group, ...layout }) => {
+    trackHostAction(socket, 'display-layout', { group: group || 'default' });
     const groupId = (typeof group === 'string' && group.trim()) ? group.trim().slice(0, 32) : 'default';
     state.displayLayouts[groupId] = layout;
     const targets = state.hostDisplayGroups.get(groupId);
@@ -490,6 +595,7 @@ io.on('connection', (socket) => {
 
   // ラベル設定（親機から）
   socket.on('host-set-label-config', (config) => {
+    trackHostAction(socket, 'host-set-label-config');
     const allowed = ['enabled','fontSize','fontFamily','x','y','textAlign','color',
                      'bgColor','bgPadding','shadowEnabled','shadowColor','shadowBlur',
                      'shadowOffsetX','shadowOffsetY','bold','italic'];
@@ -584,11 +690,13 @@ io.on('connection', (socket) => {
   // ---------- 親機コントロール ----------
 
   socket.on('host-clear', ({ seatId }) => {
+    trackHostAction(socket, 'host-clear', { seatId });
     _clearCanvasStrokesOnly(seatId);
   });
 
   // 全席クリア
   socket.on('host-clear-all', () => {
+    trackHostAction(socket, 'host-clear-all');
     for (const seatId of state.clients.keys()) {
       _clearCanvas(seatId, true);
     }
@@ -596,6 +704,7 @@ io.on('connection', (socket) => {
 
   // ロック
   socket.on('host-lock', ({ seatId }) => {
+    trackHostAction(socket, 'host-lock', { seatId });
     const client = state.clients.get(seatId);
     if (client) {
       client.locked = true;
@@ -607,6 +716,7 @@ io.on('connection', (socket) => {
 
   // アンロック
   socket.on('host-unlock', ({ seatId }) => {
+    trackHostAction(socket, 'host-unlock', { seatId });
     const client = state.clients.get(seatId);
     if (client) {
       client.locked = false;
@@ -618,6 +728,7 @@ io.on('connection', (socket) => {
 
   // 全席ロック
   socket.on('host-lock-all', () => {
+    trackHostAction(socket, 'host-lock-all');
     for (const [seatId, client] of state.clients) {
       client.locked = true;
       if (client.socketId) io.to(client.socketId).emit('lock');
@@ -627,6 +738,7 @@ io.on('connection', (socket) => {
 
   // 全席アンロック
   socket.on('host-unlock-all', () => {
+    trackHostAction(socket, 'host-unlock-all');
     for (const [seatId, client] of state.clients) {
       client.locked = false;
       if (client.socketId) io.to(client.socketId).emit('unlock');
@@ -636,6 +748,7 @@ io.on('connection', (socket) => {
 
   // 書き画面黒隠し（子機書き画面のみ）
   socket.on('host-set-writing-blackout', ({ seatId, enabled }) => {
+    trackHostAction(socket, 'host-set-writing-blackout', { seatId, enabled: !!enabled });
     const id = String(seatId || '');
     if (!id) return;
     const client = state.clients.get(id);
@@ -651,6 +764,7 @@ io.on('connection', (socket) => {
 
   // 回答オープン（特定席）
   socket.on('host-reveal', ({ seatId, animType }) => {
+    trackHostAction(socket, 'host-reveal', { seatId, animType: animType || 'slide-up' });
     const anim = animType || 'slide-up';
     const client = state.clients.get(seatId);
     if (client) {
@@ -666,6 +780,7 @@ io.on('connection', (socket) => {
 
   // 回答を隠す（フタを閉じる）
   socket.on('host-hide', ({ seatId }) => {
+    trackHostAction(socket, 'host-hide', { seatId });
     const client = state.clients.get(seatId);
     if (client) client.revealed = false;
     const displaySocketId = state.clientDisplays.get(seatId);
@@ -675,6 +790,7 @@ io.on('connection', (socket) => {
 
   // 全席オープン
   socket.on('host-reveal-all', ({ animType }) => {
+    trackHostAction(socket, 'host-reveal-all', { animType: animType || 'slide-up' });
     for (const [seatId, client] of state.clients) {
       client.revealed = true;
       client.animType = animType || 'slide-up';
@@ -688,6 +804,7 @@ io.on('connection', (socket) => {
 
   // 全席フタ閉じ
   socket.on('host-hide-all', () => {
+    trackHostAction(socket, 'host-hide-all');
     for (const [seatId, client] of state.clients) {
       client.revealed = false;
       const displaySocketId = state.clientDisplays.get(seatId);
@@ -698,6 +815,7 @@ io.on('connection', (socket) => {
 
   // 正誤判定（書き画面：色フラッシュ、セカンド：画像オーバーレイ）
   socket.on('host-judge', ({ seatId, kind, imageUrl }) => {
+    trackHostAction(socket, 'host-judge', { seatId, kind: kind || 'correct' });
     const resolvedUrl = imageUrl ||
       (kind === 'correct' ? '/overlays/correct/aka_fill.png' : '/overlays/incorrect/ao_fill.png');
     const client = state.clients.get(String(seatId));
@@ -710,6 +828,7 @@ io.on('connection', (socket) => {
 
   // 判定時描画色変換モード
   socket.on('host-set-judge-color-mode', ({ enabled }) => {
+    trackHostAction(socket, 'host-set-judge-color-mode', { enabled: !!enabled });
     state.judgeColorMode = !!enabled;
     io.emit('judge-color-mode', { enabled: state.judgeColorMode });
   });
@@ -718,12 +837,14 @@ io.on('connection', (socket) => {
   socket.on('host-set-lock-darkness', ({ value }) => {
     const v = Number(value);
     if (isNaN(v) || v < 0 || v > 100) return;
+    trackHostAction(socket, 'host-set-lock-darkness', { value: v });
     state.lockDarkness = v;
     io.emit('lock-darkness', { value: state.lockDarkness });
   });
 
   // 選択肢画像表示
   socket.on('host-show-choice', ({ imageUrl }) => {
+    trackHostAction(socket, 'host-show-choice', { hasImage: !!imageUrl });
     state.currentChoiceUrl = imageUrl || null;
     for (const [, client] of state.clients) {
       if (client.socketId) io.to(client.socketId).emit('show-choice', { imageUrl });
@@ -737,12 +858,14 @@ io.on('connection', (socket) => {
 
   // 選択肢画像消去
   socket.on('host-clear-choice', () => {
+    trackHostAction(socket, 'host-clear-choice');
     state.currentChoiceUrl = null;
     io.emit('clear-choice');
   });
 
   // 正解／不正解オーバーレイ
   socket.on('host-show-overlay', ({ seatId, kind, imageUrl }) => {
+    trackHostAction(socket, 'host-show-overlay', { seatId: seatId || 'all', kind: kind || null, hasImage: !!imageUrl });
     if (!seatId) {
       // 全席
       for (const [, client] of state.clients) {
@@ -760,6 +883,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('host-clear-overlay', (data) => {
+    trackHostAction(socket, 'host-clear-overlay', { seatId: data?.seatId || 'all' });
     const seatId = data?.seatId;
     if (!seatId) {
       for (const [, client] of state.clients) {
@@ -782,6 +906,7 @@ io.on('connection', (socket) => {
 
   // タイマー開始
   socket.on('host-timer-start', ({ duration }) => {
+    trackHostAction(socket, 'host-timer-start', { duration: duration || state.timer.duration });
     if (duration) {
       state.timer.duration = duration;
       state.timer.remaining = duration;
@@ -809,6 +934,7 @@ io.on('connection', (socket) => {
 
   // タイマー停止
   socket.on('host-timer-stop', () => {
+    trackHostAction(socket, 'host-timer-stop');
     clearInterval(state.timerInterval);
     state.timer.running = false;
     io.emit('timer-stop', { remaining: state.timer.remaining });
@@ -816,6 +942,7 @@ io.on('connection', (socket) => {
 
   // タイマーリセット
   socket.on('host-timer-reset', ({ duration }) => {
+    trackHostAction(socket, 'host-timer-reset', { duration: duration || state.timer.duration });
     clearInterval(state.timerInterval);
     state.timer.running = false;
     state.timer.remaining = duration || state.timer.duration;
@@ -840,6 +967,8 @@ io.on('connection', (socket) => {
       }
     } else if (socket.role === 'host') {
       state.hosts.delete(socket.id);
+      state.hostPanels.delete(socket.id);
+      broadcastHostPanels();
     } else if (socket.role === 'host-display') {
       const gid = socket.hostDisplayGroup || 'default';
       const grp = state.hostDisplayGroups.get(gid);

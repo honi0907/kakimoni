@@ -31,6 +31,31 @@
     background: #374151; color: #9ca3af;
   }
   #conn-indicator.ok { background: #065f46; color: var(--green); }
+  #host-ops-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: 8px;
+    flex-wrap: wrap;
+  }
+  #operator-name-btn {
+    border: 1px solid #334155;
+    background: #111827;
+    color: #93c5fd;
+    font-size: 0.72rem;
+    padding: 3px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  #operator-name-btn:hover { opacity: 0.9; }
+  #host-multi-status {
+    font-size: 0.75rem;
+    color: #94a3b8;
+  }
+  #host-last-action {
+    font-size: 0.72rem;
+    color: #fbbf24;
+  }
 
   /* ── セーブステータス ───────────────────── */
   #save-bar {
@@ -709,6 +734,11 @@
     <span>Q: <input id="save-counter-input" type="number" min="0" max="9999" value="0" title="Q番号を直接入力してEnter"></span>
     <span id="judge-invert-badge" class="off" title="判定時にパレットの色を反転">反転OFF</span>
   </div>
+  <div id="host-ops-wrap">
+    <button id="operator-name-btn" title="操作者名を変更">操作者: -</button>
+    <div id="host-multi-status">操作端末: -</div>
+    <div id="host-last-action">最終操作: -</div>
+  </div>
   <div style="font-size:0.85rem; color:#6b7280;" id="host-url"></div>
 </div>
 <div id="save-toast"></div>
@@ -952,6 +982,53 @@ let socket = null;
 let hostLabelConfig = null;
 let goActive     = false; // GOボタン押下状態
 let judgeActive  = false; // 判定GOボタン押下状態
+let hostPanels = [];
+const HOST_OPERATOR_KEY = 'host_operator_name';
+
+function detectUiType() {
+  return navigator.userAgent && navigator.userAgent.includes('Electron') ? 'electron' : 'web';
+}
+
+function loadOperatorName() {
+  const fromQuery = new URLSearchParams(location.search).get('operator');
+  if (fromQuery && fromQuery.trim()) return fromQuery.trim().slice(0, 32);
+  const fromStorage = localStorage.getItem(HOST_OPERATOR_KEY);
+  if (fromStorage && fromStorage.trim()) return fromStorage.trim().slice(0, 32);
+  return detectUiType() === 'electron' ? 'host-electron' : 'host-web';
+}
+
+let hostOperatorName = loadOperatorName();
+
+function updateOperatorButton() {
+  const btn = document.getElementById('operator-name-btn');
+  if (!btn) return;
+  btn.textContent = `操作者: ${hostOperatorName}`;
+}
+
+function updateHostPanelsUI() {
+  const el = document.getElementById('host-multi-status');
+  if (!el) return;
+  const count = hostPanels.length;
+  if (count === 0) {
+    el.textContent = '操作端末: 0台';
+    return;
+  }
+  const names = hostPanels
+    .slice(0, 3)
+    .map((p) => `${p.operatorName}(${p.uiType})`)
+    .join(', ');
+  const suffix = count > 3 ? ` 他${count - 3}台` : '';
+  el.textContent = `操作端末: ${count}台 ${names}${suffix}`;
+}
+
+function updateLastActionUI(payload) {
+  const el = document.getElementById('host-last-action');
+  if (!el || !payload) return;
+  const mine = socket && payload.socketId === socket.id;
+  const actor = `${payload.operatorName}(${payload.uiType})`;
+  const action = payload.action || 'unknown';
+  el.textContent = `最終操作: ${actor} -> ${action}${mine ? ' [この端末]' : ''}`;
+}
 
 function setGoActive(val) {
   goActive = val;
@@ -994,12 +1071,23 @@ function connect() {
   socket.on('connect', () => {
     document.getElementById('conn-indicator').textContent = '● 接続済み';
     document.getElementById('conn-indicator').className = 'ok';
-    socket.emit('register-host');
+    socket.emit('register-host', { operatorName: hostOperatorName, uiType: detectUiType() });
   });
 
   socket.on('disconnect', () => {
     document.getElementById('conn-indicator').textContent = '× 切断';
     document.getElementById('conn-indicator').className = '';
+    hostPanels = [];
+    updateHostPanelsUI();
+  });
+
+  socket.on('host-panels', ({ panels }) => {
+    hostPanels = Array.isArray(panels) ? panels : [];
+    updateHostPanelsUI();
+  });
+
+  socket.on('host-action-trace', (payload) => {
+    updateLastActionUI(payload);
   });
 
   // フル状態受信（初回 or 同期）
@@ -1883,6 +1971,21 @@ fetch('/api/overlays').then(r => r.json()).then(({ correct, incorrect }) => {
 // 起動
 // ====================================================
 document.getElementById('host-url').textContent = `${location.host}`;
+updateOperatorButton();
+updateHostPanelsUI();
+
+document.getElementById('operator-name-btn').addEventListener('click', () => {
+  const next = prompt('操作者名を入力してください（32文字まで）', hostOperatorName || '');
+  if (next == null) return;
+  const v = next.trim();
+  if (!v) return;
+  hostOperatorName = v.slice(0, 32);
+  localStorage.setItem(HOST_OPERATOR_KEY, hostOperatorName);
+  updateOperatorButton();
+  if (socket && socket.connected) {
+    socket.emit('register-host', { operatorName: hostOperatorName, uiType: detectUiType() });
+  }
+});
 
 // 1〜10席の外枠を先に生成
 for (let i = 1; i <= 10; i++) {
