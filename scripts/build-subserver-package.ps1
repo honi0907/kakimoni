@@ -1,14 +1,14 @@
 param(
   [string]$OutputRoot = "dist-subserver",
   [string]$Version = "1.0.0",
-  [switch]$IncludeNodeModules
+  [switch]$Lite
 )
 
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$mode = if ($IncludeNodeModules) { "Bundled" } else { "Lite" }
+$mode = if ($Lite) { "Lite" } else { "Bundled" }
 $packageName = "KakiMoni_SubServer-$Version-$mode"
 $workDir = Join-Path $projectRoot $OutputRoot
 $packageDir = Join-Path $workDir $packageName
@@ -44,10 +44,10 @@ foreach ($ch in @("client", "host", "layout")) {
 }
 
 Write-Host "[4/5] writing README..."
-$setupLine = if ($IncludeNodeModules) {
-  "2) Run: node server.js"
-} else {
+$setupLine = if ($Lite) {
   "2) Run: npm install --omit=dev`r`n3) Run: node server.js"
+} else {
+  "2) Run: node server.js"
 }
 $readme = @"
 KakiMoni SubServer Package ($Version / $mode)
@@ -70,7 +70,7 @@ Important:
 "@
 Set-Content -Path (Join-Path $packageDir "README_SubServer.txt") -Value $readme -Encoding utf8
 
-if ($IncludeNodeModules) {
+if (!$Lite) {
   Write-Host "[4.5/5] installing production dependencies into package..."
   Push-Location $packageDir
   try {
