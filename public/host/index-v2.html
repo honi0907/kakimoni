@@ -467,6 +467,19 @@
   .seat-name { font-weight: bold; font-size: 0.82rem;
                flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
                color: #cbd5e1; }
+  .seat-lock-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    font-size: 0.95rem;
+    color: #fbbf24;
+    text-shadow: 0 0 6px rgba(251,191,36,0.4);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .seat-lock-indicator.show { opacity: 1; }
 
   /* ロックオーバーレイ */
   .seat-canvas-wrap {
@@ -1006,6 +1019,20 @@
           <div class="settings-desc">判定GOでfill型判定画像が表示された際、パレットの色を反転（色の補色）して再描画します。子機・親機・レイアウト全画面に適用。</div>
         </div>
       </div>
+      <div class="settings-row" style="margin-top:12px;align-items:center;gap:12px;flex-wrap:wrap">
+        <label style="font-size:0.85rem;white-space:nowrap">🔒 ロック暗転濃度</label>
+        <input type="range" id="lock-darkness-slider" min="0" max="100" value="65" step="1"
+          style="flex:1;min-width:120px;accent-color:#7c3aed">
+        <span id="lock-darkness-value" style="font-size:0.85rem;color:#fbbf24;min-width:36px;text-align:right">65%</span>
+        <div class="settings-desc" style="width:100%;margin-top:2px">子機で「決定」を押すか、親機からロックした時の画面の暗転濃度です。全子機・モバイルに適用。</div>
+      </div>
+      <div class="settings-row" style="margin-top:12px;align-items:flex-start;gap:12px">
+        <input type="checkbox" id="chk-standby-unlock-link">
+        <div>
+          <label for="chk-standby-unlock-link">スタンバイ時にロックも解除する</label>
+          <div class="settings-desc">ONのとき、親機でスタンバイを押すと全ロック解除も同時に実行します。</div>
+        </div>
+      </div>
       <div class="settings-row" style="margin-top:12px;align-items:center;gap:12px">
         <label for="ctrl-bg-color" style="font-size:0.85rem;white-space:nowrap">🎨 ページ背景色</label>
         <input type="color" id="ctrl-bg-color" value="#1a1a1a" style="width:44px;height:32px;border:1px solid #374151;border-radius:4px;background:none;cursor:pointer;padding:2px">
@@ -1135,8 +1162,10 @@ const SACT_BTN_SIZE_MIN = 60;
 const SACT_BTN_SIZE_MAX = 60;
 const SEAT_LAYOUT_KEY = 'host_seat_layout_v2';
 const SEAT_FREE_LAYOUT_KEY = 'host_seat_free_layout_v2';
+const STANDBY_UNLOCK_LINK_KEY = 'host_standby_unlock_link_v2';
 let draggedSeatId = null;
 let editMode = false;
+let standbyUnlockLinked = localStorage.getItem(STANDBY_UNLOCK_LINK_KEY) === '1';
 let sactBtnSize = loadSactBtnSize();
 let seatLayoutCfg = loadSeatLayoutCfg();
 let freeLayoutCfg = loadFreeLayoutCfg();
@@ -1533,6 +1562,10 @@ function connect() {
       const chk = document.getElementById('chk-judge-color-mode');
       if (chk) chk.checked = judgeColorMode;
     }
+    // ロック暗転濃度を復元
+    if (typeof state.lockDarkness !== 'undefined') {
+      applyLockDarknessUI(state.lockDarkness);
+    }
   });
 
   // リアルタイム描画（指を魚いたタイミング）
@@ -1670,6 +1703,10 @@ function connect() {
     for (const seat of seats.values()) redrawCanvas(seat);
   });
 
+  socket.on('lock-darkness', ({ value }) => {
+    applyLockDarknessUI(value);
+  });
+
 }
 
 // ====================================================
@@ -1777,6 +1814,7 @@ function createSeatCard(id, seatData) {
       <div class="seat-header-info">
         <div class="seat-num" id="num-${id}">${id}</div>
         <div class="seat-name" id="name-${id}">${seatData.name || '未接続'}</div>
+        <div class="seat-lock-indicator" id="lockicon-${id}" title="ロック中">🔒</div>
       </div>
     </div>
     <div class="seat-canvas-wrap" id="cwrap-${id}">
@@ -1894,6 +1932,8 @@ function refreshSeatCard(id) {
 
   const numEl = document.getElementById(`num-${id}`);
   if (numEl) numEl.classList.toggle('connected-num', seat.connected);
+  const lockIconEl = document.getElementById(`lockicon-${id}`);
+  if (lockIconEl) lockIconEl.classList.toggle('show', !!seat.locked);
 
   let cardClass = 'seat-card';
   if (seat.connected)          cardClass += ' connected';
@@ -2087,13 +2127,20 @@ function updateSelectionBadge() {
   }
 }
 
+function syncGoActiveButtons() {
+  for (const [id] of seats) {
+    const selBtn = document.getElementById(`selbtn-${id}`);
+    if (selBtn) selBtn.classList.toggle('go-active', selectedSeats.has(id));
+  }
+}
+
 function toggleSelect(id) {
   const btn  = document.getElementById(`selbtn-${id}`);
   const card = document.getElementById(`card-${id}`);
   if (!btn) return;
   if (selectedSeats.has(id)) {
     selectedSeats.delete(id);
-    btn.classList.remove('selected');
+    btn.classList.remove('selected', 'go-active');
     if (card) card.classList.remove('selected');
   } else {
     selectedSeats.add(id);
@@ -2415,6 +2462,9 @@ document.getElementById('g-judge-clear').addEventListener('click', () => {
 document.getElementById('g-clear-all').addEventListener('click', () => {
   if (!confirm('全席のキャンバスをクリアしますか？')) return;
   socket.emit('host-clear-all');
+  if (standbyUnlockLinked) {
+    socket.emit('host-unlock-all');
+  }
   setGoActive(false);
   setJudgeActive(false);
   judgementKind.clear();
@@ -2461,16 +2511,8 @@ document.getElementById('g-go').addEventListener('click', async () => {
   // 一時的な凹み表示（すぐ戻る）
   setGoActive(true);
   setTimeout(() => setGoActive(false), 200);
-  // 選択中の席に go-active を付与、非選択は除去
-  for (const [id] of seats) {
-    const selBtn = document.getElementById(`selbtn-${id}`);
-    if (selBtn) selBtn.classList.toggle('go-active', selectedSeats.has(id));
-  }
-  // 全席の judged をリセット
-  for (const [id] of seats) {
-    const jb = document.getElementById(`judgebtn-${id}`);
-    if (jb) jb.classList.remove('judged');
-  }
+  // GO/正解GO が有効な席は凹み状態を維持
+  syncGoActiveButtons();
   // 連番+1して選択席を GO として保存
   try {
     const d = await fetch('/api/save-next-counter', { method: 'POST' }).then(r => r.json());
@@ -2484,6 +2526,8 @@ document.getElementById('g-judge').addEventListener('click', () => {
   // 一時的な凹み表示（すぐ戻る）
   setJudgeActive(true);
   setTimeout(() => setJudgeActive(false), 200);
+  // 正解GOはGO前提なので、選択席の凹み状態を維持
+  syncGoActiveButtons();
   for (const id of selectedSeats) {
     pendingJudgeSaves.add(String(id));
     socket.emit('host-judge', { seatId: id, kind: getJudgeKind(id) });
@@ -2493,7 +2537,32 @@ document.getElementById('g-judge').addEventListener('click', () => {
 // ====================================================
 // 起動
 // ====================================================
-document.getElementById('host-url').textContent = `${location.host}`;
+async function updateHostUrlDisplay() {
+  const el = document.getElementById('host-url');
+  if (!el) return;
+
+  const fallbackHost = `${location.host}`;
+  const localNames = ['localhost', '127.0.0.1', '::1'];
+  if (!localNames.includes(location.hostname)) {
+    el.textContent = fallbackHost;
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/ip', { cache: 'no-store' });
+    if (!res.ok) throw new Error('ip api failed');
+    const data = await res.json();
+    const ip = String(data?.ip || '').trim();
+    const port = location.port || '3000';
+    if (ip && !localNames.includes(ip)) {
+      el.textContent = `${ip}:${port}`;
+      return;
+    }
+  } catch {}
+
+  el.textContent = fallbackHost;
+}
+updateHostUrlDisplay();
 
 (async () => {
   const badge = document.getElementById('app-version-badge');
@@ -3041,6 +3110,10 @@ let judgeColorMode = localStorage.getItem('judgeColorMode') === '1';
 (function() {
   const chk = document.getElementById('chk-judge-color-mode');
   if (chk) chk.checked = judgeColorMode;
+  const savedDarkness = parseInt(localStorage.getItem('lockDarkness') ?? '65', 10);
+  applyLockDarknessUI(Number.isNaN(savedDarkness) ? 65 : savedDarkness);
+  const standbyUnlockChk = document.getElementById('chk-standby-unlock-link');
+  if (standbyUnlockChk) standbyUnlockChk.checked = standbyUnlockLinked;
 })();
 document.getElementById('btn-settings-open').addEventListener('click', () => {
   document.getElementById('settings-modal-overlay').classList.add('open');
@@ -3077,10 +3150,30 @@ document.getElementById('ctrl-bg-reset').addEventListener('click', () => {
   localStorage.setItem('pageBgColor', def);
 });
 
+function applyLockDarknessUI(value) {
+  const v = Math.max(0, Math.min(100, parseInt(value, 10) || 0));
+  const slider = document.getElementById('lock-darkness-slider');
+  const label = document.getElementById('lock-darkness-value');
+  if (slider) slider.value = String(v);
+  if (label) label.textContent = `${v}%`;
+  localStorage.setItem('lockDarkness', String(v));
+}
+
+document.getElementById('lock-darkness-slider').addEventListener('input', (e) => {
+  const v = parseInt(e.target.value, 10);
+  applyLockDarknessUI(v);
+  if (socket) socket.emit('host-set-lock-darkness', { value: v });
+});
+
+document.getElementById('chk-standby-unlock-link').addEventListener('change', (e) => {
+  standbyUnlockLinked = !!e.target.checked;
+  localStorage.setItem(STANDBY_UNLOCK_LINK_KEY, standbyUnlockLinked ? '1' : '0');
+});
+
 document.getElementById('chk-judge-color-mode').addEventListener('change', (e) => {
   judgeColorMode = e.target.checked;
   localStorage.setItem('judgeColorMode', judgeColorMode ? '1' : '0');
-  socket.emit('host-set-judge-color-mode', { enabled: judgeColorMode });
+  if (socket) socket.emit('host-set-judge-color-mode', { enabled: judgeColorMode });
 });
 // タブ切り替え
 document.querySelectorAll('.settings-tab-btn').forEach(btn => {

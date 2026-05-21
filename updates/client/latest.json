@@ -1,9 +1,9 @@
 {
-    "version":  "1.0.1",
-    "publishedAt":  "2026-05-16T04:38:27.4870942+09:00",
-    "channel":  "client",
-    "sha256":  "968f4e4524b1994f154c81afecaab0a15c6548c33053c75068d3eb1caf7874ec",
-    "notes":  "smoke test",
-    "fileName":  "kakimoni-client-1.0.1.exe",
-    "size":  176265728
+  "channel": "client",
+  "version": "v1.0.6",
+  "fileName": "kakimoni-client-v1.0.6.exe",
+  "size": 76700259,
+  "sha256": "9a51da0ff7e73d183e0308e079a13e793fc9b3e6bfbd3a706c98f02182fd0ddf",
+  "notes": "GitHub Release: https://github.com/honi0907/kakimoni-client/releases/tag/v1.0.6",
+  "publishedAt": "2026-05-20T08:42:56.959Z"
 }

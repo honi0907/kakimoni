@@ -224,6 +224,18 @@ io.on('connection', (socket) => {
     _clearCanvasStrokesOnly(seatId);
   });
 
+  // 子機側「決定」ボタン → 自席をロック
+  socket.on('client-confirm', () => {
+    const seatId = socket.seatId;
+    if (!seatId) return;
+    const client = state.clients.get(seatId);
+    if (!client || client.locked) return;
+    client.locked = true;
+    // 親機・親機セカンドへ通知（確定フラグ付き）
+    broadcastToHosts('seat-locked', { seatId, confirmedByClient: true });
+    console.log(`[子機確定] 席${seatId}`);
+  });
+
   // ── 親機コントロール ──
   socket.on('host-clear',     ({ seatId }) => _clearCanvasStrokesOnly(seatId));
   socket.on('host-clear-all', () => { for (const id of state.clients.keys()) _clearCanvas(id, true); });

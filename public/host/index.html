@@ -1548,13 +1548,20 @@ function updateSelectionBadge() {
   }
 }
 
+function syncGoActiveButtons() {
+  for (const [id] of seats) {
+    const selBtn = document.getElementById(`selbtn-${id}`);
+    if (selBtn) selBtn.classList.toggle('go-active', selectedSeats.has(id));
+  }
+}
+
 function toggleSelect(id) {
   const btn  = document.getElementById(`selbtn-${id}`);
   const card = document.getElementById(`card-${id}`);
   if (!btn) return;
   if (selectedSeats.has(id)) {
     selectedSeats.delete(id);
-    btn.classList.remove('selected');
+    btn.classList.remove('selected', 'go-active');
     btn.textContent = '選択';
     if (card) card.classList.remove('selected');
   } else {
@@ -1891,16 +1898,8 @@ document.getElementById('g-go').addEventListener('click', async () => {
   // 一時的な凹み表示（すぐ戻る）
   setGoActive(true);
   setTimeout(() => setGoActive(false), 200);
-  // 選択中の席に go-active を付与、非選択は除去
-  for (const [id] of seats) {
-    const selBtn = document.getElementById(`selbtn-${id}`);
-    if (selBtn) selBtn.classList.toggle('go-active', selectedSeats.has(id));
-  }
-  // 全席の judged をリセット
-  for (const [id] of seats) {
-    const jb = document.getElementById(`judgebtn-${id}`);
-    if (jb) jb.classList.remove('judged');
-  }
+  // GO/正解GO が有効な席は凹み状態を維持
+  syncGoActiveButtons();
   // 連番+1して選択席を GO として保存
   try {
     const d = await fetch('/api/save-next-counter', { method: 'POST' }).then(r => r.json());
@@ -1920,14 +1919,8 @@ document.getElementById('g-judge').addEventListener('click', async () => {
       socket.emit('host-hide', { seatId: id });
     }
   }
-  for (const [id] of seats) {
-    const selBtn = document.getElementById(`selbtn-${id}`);
-    if (selBtn) selBtn.classList.toggle('go-active', selectedSeats.has(id));
-  }
-  for (const [id] of seats) {
-    const jb = document.getElementById(`judgebtn-${id}`);
-    if (jb) jb.classList.remove('judged');
-  }
+  // 正解GOはGO前提なので、選択席の凹み状態を維持
+  syncGoActiveButtons();
   try {
     const d = await fetch('/api/save-next-counter', { method: 'POST' }).then(r => r.json());
     saveSession = d.session; saveCounter = d.counter; updateSaveUI();
@@ -1970,7 +1963,32 @@ fetch('/api/overlays').then(r => r.json()).then(({ correct, incorrect }) => {
 
 // 起動
 // ====================================================
-document.getElementById('host-url').textContent = `${location.host}`;
+async function updateHostUrlDisplay() {
+  const el = document.getElementById('host-url');
+  if (!el) return;
+
+  const fallbackHost = `${location.host}`;
+  const localNames = ['localhost', '127.0.0.1', '::1'];
+  if (!localNames.includes(location.hostname)) {
+    el.textContent = fallbackHost;
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/ip', { cache: 'no-store' });
+    if (!res.ok) throw new Error('ip api failed');
+    const data = await res.json();
+    const ip = String(data?.ip || '').trim();
+    const port = location.port || '3000';
+    if (ip && !localNames.includes(ip)) {
+      el.textContent = `${ip}:${port}`;
+      return;
+    }
+  } catch {}
+
+  el.textContent = fallbackHost;
+}
+updateHostUrlDisplay();
 updateOperatorButton();
 updateHostPanelsUI();
 

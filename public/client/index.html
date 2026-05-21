@@ -5,7 +5,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KakiMoni - 子機設定</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; touch-action: none; }
@@ -102,7 +102,7 @@
   .setup-btn-vis-item { display: flex; align-items: center; gap: 8px; cursor: pointer;
     padding: 8px 14px; border-radius: 3px; background: #2d2d4a;
     border: 2px solid #4a4a8a; color: #eee; font-size: 0.95rem;
-    user-select: none; transition: border-color 0.15s; }
+    -webkit-user-select: none; user-select: none; transition: border-color 0.15s; }
   .setup-btn-vis-item:hover { border-color: #a78bfa; }
   .setup-btn-vis-item input[type='checkbox'] { width: 18px; height: 18px; accent-color: #a78bfa; cursor: pointer; margin: 0; }
   #setup-palette-wrap { margin-bottom: 0; }
@@ -406,6 +406,11 @@
 
     <!-- ボタン -->
     <div class="setup-btns" style="grid-template-columns:1fr;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <button id="btn-load-server-settings" type="button" style="background:#1d4ed8;">サーバー設定を読込</button>
+        <button id="btn-save-server-settings" type="button" style="background:#0f766e;">この設定をサーバー保存</button>
+      </div>
+      <div id="server-settings-status" style="font-size:0.82rem; color:#93c5fd; text-align:center; min-height:1.2em;"></div>
       <button id="btn-start">接続してスタート</button>
     </div>
   </div>
@@ -557,6 +562,140 @@ document.getElementById('btn-start').addEventListener('click', () => {
       lbl.textContent = 'セカンド: ' + secondUrl;
       lbl.style.display = 'inline';
     }
+  }
+
+  // スタート時に現在の設定をID単位でサーバーへ保存（失敗しても開始は継続）
+  void saveClientSettingsToServer(serverUrl, seatId);
+});
+
+function buildClientSettingsPayload() {
+  return {
+    serverUrl: String(document.getElementById('input-server-url').value || '').trim().replace(/\/$/, ''),
+    seatId: String(document.getElementById('input-seat').value || ''),
+    bgUrl: selectedSetupBgUrl || '',
+    logoUrl: selectedSetupLogoUrl || '',
+    palette: Array.isArray(setupPalette) ? [...setupPalette] : [],
+    penSize: Number(setupPenSize) || DEFAULT_PEN_SIZE,
+    visUndo: document.getElementById('vis-undo').checked,
+    visClear: document.getElementById('vis-clear').checked,
+    visConfirm: document.getElementById('vis-confirm').checked,
+    visEraser: document.getElementById('vis-eraser').checked,
+    visSecond: document.getElementById('vis-second').checked,
+  };
+}
+
+function applyClientSettingsPayload(settings) {
+  if (!settings || typeof settings !== 'object') return;
+
+  if (typeof settings.serverUrl === 'string') {
+    const url = settings.serverUrl.trim().replace(/\/$/, '');
+    document.getElementById('input-server-url').value = url;
+    localStorage.setItem('kakimoni_server_url', url);
+  }
+
+  if (typeof settings.bgUrl === 'string') {
+    selectedSetupBgUrl = settings.bgUrl;
+    localStorage.setItem('kakimoni_bg', selectedSetupBgUrl);
+    document.querySelectorAll('.setup-bg-item, .setup-bg-none').forEach(el => {
+      el.classList.toggle('selected', el.dataset.url === selectedSetupBgUrl);
+    });
+  }
+
+  if (typeof settings.logoUrl === 'string') {
+    selectedSetupLogoUrl = settings.logoUrl;
+    localStorage.setItem('kakimoni_logo', selectedSetupLogoUrl);
+    document.querySelectorAll('.setup-logo-item, .setup-logo-none').forEach(el => {
+      el.classList.toggle('selected', el.dataset.url === selectedSetupLogoUrl);
+    });
+  }
+
+  if (Array.isArray(settings.palette) && settings.palette.length > 0) {
+    setupPalette = settings.palette.slice(0, 8).filter(c => typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c));
+    if (setupPalette.length === 0) setupPalette = [...DEFAULT_PALETTE];
+    localStorage.setItem('kakimoni_palette', JSON.stringify(setupPalette));
+    renderSetupPalette();
+  }
+
+  if (Number.isFinite(Number(settings.penSize))) {
+    const n = Math.max(2, Math.min(40, Number(settings.penSize)));
+    setupPenSize = n;
+    setupSizeSlider.value = String(n);
+    setupSizeValEl.textContent = String(n);
+    localStorage.setItem('kakimoni_pensize', String(n));
+  }
+
+  const boolOrDefault = (v, d = true) => (typeof v === 'boolean' ? v : d);
+  document.getElementById('vis-undo').checked = boolOrDefault(settings.visUndo, true);
+  document.getElementById('vis-clear').checked = boolOrDefault(settings.visClear, true);
+  document.getElementById('vis-confirm').checked = boolOrDefault(settings.visConfirm, true);
+  document.getElementById('vis-eraser').checked = boolOrDefault(settings.visEraser, true);
+  document.getElementById('vis-second').checked = boolOrDefault(settings.visSecond, true);
+
+  localStorage.setItem('kakimoni_vis_undo', document.getElementById('vis-undo').checked ? '1' : '0');
+  localStorage.setItem('kakimoni_vis_clear', document.getElementById('vis-clear').checked ? '1' : '0');
+  localStorage.setItem('kakimoni_vis_confirm', document.getElementById('vis-confirm').checked ? '1' : '0');
+  localStorage.setItem('kakimoni_vis_eraser', document.getElementById('vis-eraser').checked ? '1' : '0');
+  localStorage.setItem('kakimoni_vis_second', document.getElementById('vis-second').checked ? '1' : '0');
+}
+
+function setServerSettingsStatus(msg, isError = false) {
+  const el = document.getElementById('server-settings-status');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.style.color = isError ? '#fca5a5' : '#93c5fd';
+}
+
+async function loadClientSettingsFromServer(serverUrl, seat) {
+  const base = String(serverUrl || '').trim().replace(/\/$/, '');
+  const sid = parseInt(String(seat || ''), 10);
+  if (!base || !sid) throw new Error('サーバーURLとIDを入力してください');
+  const r = await fetch(`${base}/api/client-settings/${sid}`);
+  const data = await r.json();
+  if (!r.ok || !data?.ok) throw new Error(data?.error || `HTTP ${r.status}`);
+  return data;
+}
+
+async function saveClientSettingsToServer(serverUrl, seat) {
+  const base = String(serverUrl || '').trim().replace(/\/$/, '');
+  const sid = parseInt(String(seat || ''), 10);
+  if (!base || !sid) return;
+  const payload = { settings: buildClientSettingsPayload() };
+  const r = await fetch(`${base}/api/client-settings/${sid}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok || !data?.ok) throw new Error(data?.error || `HTTP ${r.status}`);
+  return data;
+}
+
+document.getElementById('btn-load-server-settings').addEventListener('click', async () => {
+  const url = document.getElementById('input-server-url').value;
+  const sid = document.getElementById('input-seat').value;
+  setServerSettingsStatus('サーバー設定を読込中...');
+  try {
+    const data = await loadClientSettingsFromServer(url, sid);
+    if (!data.settings) {
+      setServerSettingsStatus(`ID ${sid} の保存設定はまだありません`);
+      return;
+    }
+    applyClientSettingsPayload(data.settings);
+    setServerSettingsStatus(`ID ${sid} の設定を読込みました`);
+  } catch (e) {
+    setServerSettingsStatus(`読込失敗: ${e.message}`, true);
+  }
+});
+
+document.getElementById('btn-save-server-settings').addEventListener('click', async () => {
+  const url = document.getElementById('input-server-url').value;
+  const sid = document.getElementById('input-seat').value;
+  setServerSettingsStatus('サーバーへ保存中...');
+  try {
+    await saveClientSettingsToServer(url, sid);
+    setServerSettingsStatus(`ID ${sid} の設定を保存しました`);
+  } catch (e) {
+    setServerSettingsStatus(`保存失敗: ${e.message}`, true);
   }
 });
 
