@@ -1,6 +1,6 @@
 {
   "name": "kakimoni",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "クイズ番組用タブレット書きシステム",
   "main": "server.js",
   "scripts": {

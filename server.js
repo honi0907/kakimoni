@@ -101,6 +101,10 @@ function trackHostAction(socket, action, detail = {}) {
 // ============================================================
 // 静的ファイル配信
 // ============================================================
+app.get(['/host', '/host/', '/hostweb', '/hostweb/', '/host/index.html'], (req, res) => {
+  res.redirect(302, '/host-v2');
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ルートアクセス時はトップページへ
