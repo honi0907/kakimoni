@@ -34,6 +34,12 @@
   .layout-cell {
     position: relative; overflow: hidden; background: #fff;
   }
+  .cell-bg-layer {
+    position: absolute; inset: 0; z-index: 1;
+    background: #fff;
+    background-repeat: no-repeat;
+    background-position: center;
+  }
   .cell-canvas {
     width: 100%; height: 100%; display: block; position: absolute; inset: 0; z-index: 9;
   }
@@ -119,7 +125,12 @@ let hdLabelConfig = null;  // ラベル設宁E
 const hdSeatNames = {};    // seatId -> name
 let hdCurrentChoiceUrl = null; // 選択肢画像URL
 let judgeColorMode = false;
+let judgeFillLayerMode = 'over';
 const connectedSeats = new Set(); // 接続中seatId
+
+function normalizeJudgeFillLayerMode(mode) {
+  return String(mode || '').trim().toLowerCase() === 'under' ? 'under' : 'over';
+}
 
 function applyHdCellLabel(seatId) {
   const d = seatData.get(String(seatId));
@@ -203,6 +214,7 @@ function connect() {
     if (state.choiceImageUrl) applyHdChoice(state.choiceImageUrl);
     else clearHdChoice();
     if (typeof state.judgeColorMode !== 'undefined') judgeColorMode = !!state.judgeColorMode;
+    if (typeof state.judgeFillLayerMode !== 'undefined') judgeFillLayerMode = normalizeJudgeFillLayerMode(state.judgeFillLayerMode);
     if (currentLayout) applyLayout(currentLayout);
     updateDisconnectedOverlays();
   });
@@ -249,6 +261,13 @@ function connect() {
     if (d.ctx) redraw(d);
     // 判定オーバ�Eレイも消去
     if (d.cellEl) { const ov = d.cellEl.querySelector('.cell-judge-overlay'); if (ov) ov.classList.remove('show'); }
+  });
+  socket.on('canvas-cleared-strokes', ({ seatId }) => {
+    const d = seatData.get(String(seatId));
+    if (!d) return;
+    d.strokes = [];
+    d.currentStroke = null;
+    if (d.ctx) redraw(d);
   });
   socket.on('seat-strokes-updated', ({ seatId, strokes }) => {
     const d = seatData.get(String(seatId));
@@ -318,6 +337,10 @@ function connect() {
     judgeColorMode = enabled;
     for (const d of seatData.values()) { if (d.ctx) redraw(d); }
   });
+  socket.on('judge-fill-layer-mode', ({ mode }) => {
+    judgeFillLayerMode = normalizeJudgeFillLayerMode(mode);
+    for (const d of seatData.values()) { if (d.ctx) redraw(d); }
+  });
 }
 
 // ====================================================
@@ -341,13 +364,19 @@ function createTextOverlay(cell) {
   return wrap;
 }
 
+function normalizeFreeBgScale(raw) {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return 100;
+  return Math.max(50, Math.min(200, Math.round(n)));
+}
+
 function applyLayout(layout) {
   waiting.style.display = 'none';
   layoutGrid.classList.add('active');
   layoutGrid.innerHTML = '';
 
   // 旧canvasの参�EをリセチE��
-  for (const [, d] of seatData) { d.canvas = null; d.ctx = null; d.cellEl = null; d.overlayEl = null; }
+  for (const [, d] of seatData) { d.canvas = null; d.ctx = null; d.cellEl = null; d.bgLayerEl = null; d.overlayEl = null; }
 
   if (layout.type === 'free') {
     // ─── フリーモーチE───
@@ -357,9 +386,11 @@ function applyLayout(layout) {
     layoutGrid.style.gridTemplateRows    = '';
     // 背景画像適用
     if (layout.bgUrl) {
+      const bgScale = normalizeFreeBgScale(layout.bgScale);
       layoutGrid.style.backgroundImage    = `url("${layout.bgUrl}")`;
-      layoutGrid.style.backgroundSize     = 'cover';
+      layoutGrid.style.backgroundSize     = `${bgScale}%`;
       layoutGrid.style.backgroundPosition = 'center';
+      layoutGrid.style.backgroundRepeat   = 'no-repeat';
     } else {
       layoutGrid.style.backgroundImage = '';
     }
@@ -384,6 +415,9 @@ function applyLayout(layout) {
         continue;
       }
       div.className = 'layout-cell';
+      const bgLayer = document.createElement('div');
+      bgLayer.className = 'cell-bg-layer';
+      div.appendChild(bgLayer);
       const canvas = document.createElement('canvas');
       canvas.className = 'cell-canvas';
       div.appendChild(canvas);
@@ -391,10 +425,11 @@ function applyLayout(layout) {
 
       if (cell.seatId) {
         let d = seatData.get(String(cell.seatId));
-        if (!d) { d = { canvas: null, ctx: null, strokes: [], currentStroke: null, bgImg: null, overlayEl: null }; seatData.set(String(cell.seatId), d); }
+        if (!d) { d = { canvas: null, ctx: null, strokes: [], currentStroke: null, bgImg: null, bgLayerEl: null, overlayEl: null }; seatData.set(String(cell.seatId), d); }
         d.canvas = canvas;
         d.ctx    = canvas.getContext('2d');
         d.cellEl = div;
+        d.bgLayerEl = bgLayer;
         const ov = document.createElement('div');
         ov.className = 'disconnected-overlay';
         ov.textContent = '未接続';
@@ -428,16 +463,20 @@ function applyLayout(layout) {
         continue;
       }
       cell.className = 'layout-cell' + (currentKeepRatio ? ' keep-ratio' : '');
+      const bgLayer = document.createElement('div');
+      bgLayer.className = 'cell-bg-layer';
+      cell.appendChild(bgLayer);
       const canvas = document.createElement('canvas');
       canvas.className = 'cell-canvas';
       cell.appendChild(canvas);
       layoutGrid.appendChild(cell);
 
       let d = seatData.get(String(seatId));
-      if (!d) { d = { canvas: null, ctx: null, strokes: [], currentStroke: null, bgImg: null, overlayEl: null }; seatData.set(String(seatId), d); }
+      if (!d) { d = { canvas: null, ctx: null, strokes: [], currentStroke: null, bgImg: null, bgLayerEl: null, overlayEl: null }; seatData.set(String(seatId), d); }
       d.canvas = canvas;
       d.ctx    = canvas.getContext('2d');
       d.cellEl = cell;
+      d.bgLayerEl = bgLayer;
       const ov = document.createElement('div');
       ov.className = 'disconnected-overlay';
       ov.textContent = '未接続';
@@ -501,6 +540,14 @@ function resizeCanvas(d) {
   d.canvas.style.right  = '';
   d.canvas.style.bottom = '';
   d.canvas.style.background = currentKeepRatio ? '#fff' : '';
+  if (d.bgLayerEl) {
+    d.bgLayerEl.style.width = cw + 'px';
+    d.bgLayerEl.style.height = ch + 'px';
+    d.bgLayerEl.style.left = ox + 'px';
+    d.bgLayerEl.style.top = oy + 'px';
+    d.bgLayerEl.style.right = '';
+    d.bgLayerEl.style.bottom = '';
+  }
   d.ctx.setTransform(1, 0, 0, 1, 0, 0);
   d.ctx.scale(r, r);
 }
@@ -511,22 +558,32 @@ function clearCanvas(d) {
   d.ctx.clearRect(0, 0, w, h);
 }
 
+function updateCellBackground(d) {
+  if (!d?.bgLayerEl) return;
+  const layer = d.bgLayerEl;
+  if (d.fillImageUrl && d.bgImg?.src) {
+    if (judgeFillLayerMode === 'over') {
+      layer.style.backgroundImage = `url('${d.fillImageUrl}'), url('${d.bgImg.src}')`;
+      layer.style.backgroundSize = '100% 100%, cover';
+    } else {
+      layer.style.backgroundImage = `url('${d.bgImg.src}'), url('${d.fillImageUrl}')`;
+      layer.style.backgroundSize = 'cover, 100% 100%';
+    }
+  } else if (d.fillImageUrl) {
+    layer.style.backgroundImage = `url('${d.fillImageUrl}')`;
+    layer.style.backgroundSize = '100% 100%';
+  } else if (d.bgImg?.src) {
+    layer.style.backgroundImage = `url('${d.bgImg.src}')`;
+    layer.style.backgroundSize = 'cover';
+  } else {
+    layer.style.backgroundImage = '';
+    layer.style.backgroundSize = '';
+  }
+}
+
 function redraw(d) {
   clearCanvas(d);
-  // fill 画像は cell の background として適用（canvas は透明のままにする）
-  if (d.cellEl) {
-    d.cellEl.style.backgroundImage    = d.fillImageUrl ? `url('${d.fillImageUrl}')` : '';
-    d.cellEl.style.backgroundSize     = d.fillImageUrl ? '100% 100%' : '';
-    d.cellEl.style.backgroundRepeat   = d.fillImageUrl ? 'no-repeat' : '';
-    d.cellEl.style.backgroundPosition = d.fillImageUrl ? 'center' : '';
-  }
-  const w = d.canvas.width  / (window.devicePixelRatio || 1);
-  const h = d.canvas.height / (window.devicePixelRatio || 1);
-  if (d.bgImg) {
-    const sc = Math.max(w / d.bgImg.naturalWidth, h / d.bgImg.naturalHeight);
-    const dw = d.bgImg.naturalWidth * sc, dh = d.bgImg.naturalHeight * sc;
-    d.ctx.drawImage(d.bgImg, (w - dw) / 2, (h - dh) / 2, dw, dh);
-  }
+  updateCellBackground(d);
   const inv = judgeColorMode && d.judging;
   for (const s of d.strokes) drawFullStroke(d.ctx, d.canvas, s, inv);
   if (d.currentStroke) drawFullStroke(d.ctx, d.canvas, d.currentStroke, inv);

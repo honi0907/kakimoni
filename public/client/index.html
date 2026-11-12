@@ -15,37 +15,57 @@
   /* ── 設定モーダル ─────────────────────── */
   #setup-modal {
     position: fixed; inset: 0; background: rgba(0,0,0,0.92);
-    display: flex; align-items: flex-start; justify-content: center;
-    z-index: 1000; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; overflow-y: auto;
     padding: 16px 0; touch-action: pan-y;
   }
   #setup-modal, #setup-modal * { touch-action: pan-y; }
   .setup-box {
     background: #1e1e2e; border: 2px solid #4a4a8a; border-radius: 4px;
-    padding: 20px 28px; width: 95%; max-width: 760px; text-align: center;
+    padding: 18px 24px; width: 95%; max-width: 980px; text-align: center;
     flex-shrink: 0; touch-action: pan-y;
   }
-  .setup-box h2 { color: #a78bfa; margin-bottom: 16px; font-size: 1.6rem; }
+  .setup-box h2 { color: #a78bfa; margin-bottom: 12px; font-size: 1.4rem; }
   /* 2カラム行 */
   .setup-row {
     display: grid; grid-template-columns: 1fr 1fr;
-    gap: 14px; margin-bottom: 14px; text-align: left;
+    gap: 10px; margin-bottom: 10px; text-align: left;
   }
   .setup-row.full { grid-template-columns: 1fr; }
   .setup-col { display: flex; flex-direction: column; }
   .setup-box label { display: block; text-align: left; margin-bottom: 6px;
-                     color: #aaa; font-size: 0.9rem; }
+                     color: #aaa; font-size: 0.84rem; }
   .setup-box input, .setup-box select {
-    width: 100%; padding: 10px 14px; border-radius: 3px;
+    width: 100%; padding: 8px 12px; border-radius: 3px;
     background: #2d2d4a; border: 2px solid #4a4a8a; color: #eee;
-    font-size: 1rem; margin-bottom: 0; outline: none;
+    font-size: 0.92rem; margin-bottom: 0; outline: none;
   }
   .setup-box input:focus, .setup-box select:focus { border-color: #a78bfa; }
-  .setup-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+
+  .setup-top-actions {
+    display: grid;
+    grid-template-columns: minmax(380px, 1fr) 210px 210px;
+    gap: 8px;
+    align-items: end;
+  }
+  .setup-top-actions .setup-col { min-width: 0; }
+  .setup-mini-btn {
+    height: 38px;
+    padding: 0 10px !important;
+    font-size: 0.84rem !important;
+    white-space: nowrap;
+  }
+  .setup-seat-start {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) 220px;
+    gap: 8px;
+    align-items: end;
+  }
+  .setup-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
   .setup-box button {
-    width: 100%; padding: 13px;
+    width: 100%; padding: 11px;
     border-radius: 3px; border: none; cursor: pointer;
-    font-size: 1.1rem; font-weight: bold; color: #fff;
+    font-size: 0.98rem; font-weight: bold; color: #fff;
     box-shadow: 0 4px 0 rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.18);
     transition: box-shadow 0.1s, transform 0.1s;
   }
@@ -58,7 +78,7 @@
   #setup-bg-grid, #setup-logo-grid {
     display: flex; flex-direction: column;
     gap: 6px; margin-bottom: 0;
-    max-height: 190px; overflow-y: auto;
+    max-height: 150px; overflow-y: auto;
   }
   .setup-bg-item, .setup-logo-item, .setup-bg-none, .setup-logo-none {
     border-radius: 3px; cursor: pointer;
@@ -97,14 +117,30 @@
     font-size: 0.8rem;
   }
 
-  /* ボタン表示設定 チェックボックス行 */
-  #setup-btn-vis { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 4px; }
+  /* ボタン表示設定 チェックボックス群 */
+  #setup-btn-vis {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 6px;
+  }
+  .setup-btn-vis-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 4px;
+    background: rgba(45, 45, 74, 0.72);
+    border: 1px solid #4a4a8a;
+  }
   .setup-btn-vis-item { display: flex; align-items: center; gap: 8px; cursor: pointer;
-    padding: 8px 14px; border-radius: 3px; background: #2d2d4a;
-    border: 2px solid #4a4a8a; color: #eee; font-size: 0.95rem;
-    -webkit-user-select: none; user-select: none; transition: border-color 0.15s; }
+    padding: 6px 10px; border-radius: 3px; background: #22223b;
+    border: 1px solid #46507a; color: #eee; font-size: 0.9rem;
+    -webkit-user-select: none; user-select: none; transition: border-color 0.15s, transform 0.15s; }
   .setup-btn-vis-item:hover { border-color: #a78bfa; }
   .setup-btn-vis-item input[type='checkbox'] { width: 18px; height: 18px; accent-color: #a78bfa; cursor: pointer; margin: 0; }
+  .setup-btn-vis-title { font-size: 0.78rem; color: #93c5fd; margin-bottom: 4px; letter-spacing: 0.03em; }
+  .setup-btn-vis-note { font-size: 0.74rem; color: #94a3b8; margin-top: 4px; line-height: 1.35; }
   #setup-palette-wrap { margin-bottom: 0; }
   #setup-palette-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
   .setup-color-item { position: relative; }
@@ -131,12 +167,40 @@
   #setup-size-slider { flex: 1; accent-color: #a78bfa; }
   #setup-size-val { color: #a78bfa; font-weight: bold; min-width: 28px; text-align: right; }
 
+  @media (max-height: 860px) and (min-width: 900px) {
+    #setup-modal { padding: 8px 0; }
+    .setup-box { padding: 12px 16px; max-width: 1080px; }
+    .setup-box h2 { margin-bottom: 8px; font-size: 1.2rem; }
+    .setup-row { gap: 8px; margin-bottom: 8px; }
+    #setup-bg-grid, #setup-logo-grid { max-height: 118px; }
+    #setup-palette-list { gap: 6px; margin-bottom: 6px; }
+    .setup-color-swatch { width: 34px; height: 34px; }
+    #btn-palette-add { padding: 5px 10px; font-size: 0.76rem; }
+    #setup-size-wrap { gap: 8px; }
+    #setup-btn-vis { gap: 8px; margin-top: 4px; }
+    .setup-btn-vis-group { padding: 8px; gap: 6px; }
+    .setup-btn-vis-item { padding: 5px 8px; font-size: 0.82rem; }
+    .setup-btn-vis-note { display: none; }
+    .setup-btns { gap: 8px; margin-top: 4px; }
+    .setup-box button { padding: 9px; font-size: 0.88rem; }
+    .setup-top-actions {
+      grid-template-columns: minmax(300px, 1fr) 190px 190px;
+      gap: 6px;
+    }
+    .setup-mini-btn { height: 34px; font-size: 0.78rem !important; }
+    .setup-seat-start { grid-template-columns: minmax(220px, 1fr) 180px; gap: 6px; }
+    #server-settings-status { font-size: 0.76rem !important; }
+  }
+
   /* ── スマホ対応 ───────────────────────── */
   @media (max-width: 600px) {
     .setup-box { padding: 16px 14px; }
     .setup-row { grid-template-columns: 1fr; gap: 10px; margin-bottom: 10px; }
+    .setup-top-actions { grid-template-columns: 1fr; }
+    .setup-seat-start { grid-template-columns: 1fr; }
     .setup-btns { grid-template-columns: 1fr; }
     #setup-bg-grid, #setup-logo-grid { max-height: none; }
+    #setup-btn-vis { grid-template-columns: 1fr; }
     #setup-btn-vis { gap: 10px; }
   }
 
@@ -200,6 +264,26 @@
 
   #btn-eraser { background: linear-gradient(180deg,#ea580c 0%,#c2410c 100%); color: #fff; position: relative; overflow: visible; }
   #btn-eraser.active-tool { outline: 3px solid rgba(255,255,255,0.9); outline-offset: 2px; }
+  #eraser-countdown-label {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    transform: translateX(-50%);
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid #334155;
+    background: rgba(15, 23, 42, 0.92);
+    color: #fef3c7;
+    font-size: 0.66rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.12s;
+    z-index: 2;
+  }
+  #btn-eraser.show-countdown #eraser-countdown-label { opacity: 1; }
   #btn-eraser.counting::after {
     content: ''; position: absolute; bottom: -4px; left: 0;
     height: 3px; border-radius: 2px; background: rgba(255,255,255,0.75);
@@ -228,7 +312,7 @@
     overflow: hidden;
   }
   #bg-canvas   { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; z-index: 0; }
-  #main-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; z-index: 9; }
+  #main-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; z-index: 22; }
 
   /* ロックオーバーレイ */
   #lock-overlay {
@@ -253,7 +337,7 @@
   #writing-blackout-overlay.active { display: block; }
 
   #judge-overlay {
-    position: absolute; inset: 0; z-index: 20;
+    position: absolute; inset: 0; z-index: 7;
     pointer-events: none; display: none;
     align-items: center; justify-content: center;
   }
@@ -280,11 +364,95 @@
 
   /* 選択肢レイヤー */
   #choice-layer {
-    position: absolute; inset: 0; z-index: 12;
+    position: absolute; inset: 0; z-index: 8;
     display: none; pointer-events: none;
   }
   #choice-layer.show { display: block; }
   #choice-layer img { width: 100%; height: 100%; object-fit: contain; }
+
+  /* inline style removal helpers */
+  #duplicate-error {
+    display: none;
+    background: #7f1d1d;
+    border: 2px solid #ef4444;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 18px;
+    color: #fca5a5;
+    font-size: 1rem;
+    font-weight: bold;
+    text-align: center;
+    line-height: 1.5;
+  }
+  #duplicate-error .back-to-launcher-btn {
+    display: block;
+    margin: 12px auto 0;
+    padding: 8px 20px;
+    background: #b91c1c;
+    border: 2px solid #fca5a5;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  #input-server-url { border-radius: 3px; font-size: 0.9rem; }
+  #btn-save-server-settings { background: #0f766e; }
+  #btn-load-server-settings { background: #1d4ed8; }
+  #server-settings-status {
+    font-size: 0.82rem;
+    color: #93c5fd;
+    text-align: center;
+    min-height: 1.1em;
+    margin-bottom: 6px;
+  }
+  #seat-label-fixed {
+    display: none;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: #2d2d4a;
+    border: 2px solid #4a4a8a;
+    color: #a78bfa;
+    font-size: 1rem;
+    font-weight: bold;
+  }
+  #second-url-label {
+    display: none;
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: #aaa;
+    -webkit-user-select: all;
+    user-select: all;
+  }
+  #back-confirm-dlg {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+  }
+  .back-confirm-box {
+    background: #1e1e2e;
+    border: 2px solid #4a4a8a;
+    border-radius: 16px;
+    padding: 28px 36px;
+    text-align: center;
+  }
+  .back-confirm-msg { color: #eee; font-size: 1.2rem; margin-bottom: 20px; }
+  .back-confirm-actions { display: flex; gap: 14px; justify-content: center; }
+  #back-confirm-yes,
+  #back-confirm-no {
+    padding: 10px 28px;
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  #back-confirm-yes { background: #7c3aed; }
+  #back-confirm-no { background: #475569; }
 
   /* 接続状態インジケーター */
   #conn-dot {
@@ -302,48 +470,59 @@
   <div class="setup-box">
     <h2>✏️ KakiMoni 子機</h2>
     <!-- ID重複エラー表示 -->
-    <div id="duplicate-error" style="display:none; background:#7f1d1d; border:2px solid #ef4444;
-         border-radius:10px; padding:14px 16px; margin-bottom:18px; color:#fca5a5;
-         font-size:1rem; font-weight:bold; text-align:center; line-height:1.5;">
+    <div id="duplicate-error">
       ⚠️ このIDはすでに別のデバイスで使用中です。<br>
       別のIDを選択するか、先に接続しているデバイスを切断してください。
       <button onclick="document.exitFullscreen().catch(()=>{}); if(window.electronAPI){window.electronAPI.goToLauncher();}else{location.reload();}"
-              style="display:block; margin:12px auto 0; padding:8px 20px;
-                     background:#b91c1c; border:2px solid #fca5a5; border-radius:8px;
-                     color:#fff; font-size:0.9rem; font-weight:bold; cursor:pointer;">
+              class="back-to-launcher-btn">
         ← ランチャーに戻る
       </button>
     </div>
 
-    <!-- 行0: サーバーURL -->
+    <!-- 行0: サーバーURL + サーバー設定操作 -->
     <div class="setup-row full">
-      <div class="setup-col">
-        <label for="input-server-url">サーバーURL</label>
-        <input type="text" id="input-server-url" placeholder="http://192.168.x.x:3000"
-               style="border-radius:3px; font-size:0.95rem;">
+      <div class="setup-top-actions">
+        <div class="setup-col">
+          <label for="input-server-url">サーバーURL</label>
+          <input type="text" id="input-server-url" placeholder="http://192.168.x.x:3000"
+                   >
+        </div>
+        <div class="setup-col">
+          <label>&nbsp;</label>
+            <button id="btn-save-server-settings" class="setup-mini-btn" type="button">この設定をサーバー保存</button>
+        </div>
+        <div class="setup-col">
+          <label>&nbsp;</label>
+            <button id="btn-load-server-settings" class="setup-mini-btn" type="button">サーバー設定を読込</button>
+        </div>
       </div>
     </div>
+      <div id="server-settings-status"></div>
 
-    <!-- 行1: ID (単独) -->
+    <!-- 行1: ID + 接続スタート -->
     <div class="setup-row full" id="seat-row">
-      <div class="setup-col">
-        <label for="input-seat">ID</label>
-        <select id="input-seat">
-          <option value="1">1番</option>
-          <option value="2">2番</option>
-          <option value="3">3番</option>
-          <option value="4">4番</option>
-          <option value="5">5番</option>
-          <option value="6">6番</option>
-          <option value="7">7番</option>
-          <option value="8">8番</option>
-          <option value="9">9番</option>
-          <option value="10">10番</option>
-        </select>
-        <!-- Electronランチャーから開いた場合の表示ラベル -->
-        <div id="seat-label-fixed" style="display:none; padding:10px 14px; border-radius:10px;
-             background:#2d2d4a; border:2px solid #4a4a8a; color:#a78bfa;
-             font-size:1rem; font-weight:bold;"></div>
+      <div class="setup-seat-start">
+        <div class="setup-col">
+          <label for="input-seat">ID</label>
+          <select id="input-seat">
+            <option value="1">1番</option>
+            <option value="2">2番</option>
+            <option value="3">3番</option>
+            <option value="4">4番</option>
+            <option value="5">5番</option>
+            <option value="6">6番</option>
+            <option value="7">7番</option>
+            <option value="8">8番</option>
+            <option value="9">9番</option>
+            <option value="10">10番</option>
+          </select>
+          <!-- Electronランチャーから開いた場合の表示ラベル -->
+          <div id="seat-label-fixed"></div>
+        </div>
+        <div class="setup-col">
+          <label>&nbsp;</label>
+          <button id="btn-start">接続してスタート</button>
+        </div>
       </div>
     </div>
 
@@ -384,35 +563,36 @@
     <div class="setup-row full">
       <div class="setup-col">
         <label>書き画面のボタン表示</label>
+        <div class="setup-btn-vis-note">必要な操作だけを残して、席ごとに見せ方を揃えられます。</div>
         <div id="setup-btn-vis">
-          <label class="setup-btn-vis-item">
-            <input type="checkbox" id="vis-undo" checked>１つ戻る
-          </label>
-          <label class="setup-btn-vis-item">
-            <input type="checkbox" id="vis-clear" checked>クリア
-          </label>
-          <label class="setup-btn-vis-item">
-            <input type="checkbox" id="vis-confirm" checked>決定
-          </label>
-          <label class="setup-btn-vis-item">
-            <input type="checkbox" id="vis-eraser" checked>消しゴム
-          </label>
-          <label class="setup-btn-vis-item">
-            <input type="checkbox" id="vis-second" checked>セカンド画面送出
-          </label>
+          <div class="setup-btn-vis-group">
+            <div class="setup-btn-vis-title">書き画面</div>
+            <label class="setup-btn-vis-item">
+              <input type="checkbox" id="vis-undo" checked>１つ戻る
+            </label>
+            <label class="setup-btn-vis-item">
+              <input type="checkbox" id="vis-clear" checked>クリア
+            </label>
+            <label class="setup-btn-vis-item">
+              <input type="checkbox" id="vis-confirm" checked>決定
+            </label>
+            <label class="setup-btn-vis-item">
+              <input type="checkbox" id="vis-eraser" checked>消しゴム
+            </label>
+          </div>
+          <div class="setup-btn-vis-group">
+            <div class="setup-btn-vis-title">表示・送出</div>
+            <label class="setup-btn-vis-item">
+              <input type="checkbox" id="vis-second" checked>セカンド画面送出
+            </label>
+            <label class="setup-btn-vis-item">
+              <input type="checkbox" id="vis-judge-overlay" checked>正誤判定画像を表示
+            </label>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- ボタン -->
-    <div class="setup-btns" style="grid-template-columns:1fr;">
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-        <button id="btn-load-server-settings" type="button" style="background:#1d4ed8;">サーバー設定を読込</button>
-        <button id="btn-save-server-settings" type="button" style="background:#0f766e;">この設定をサーバー保存</button>
-      </div>
-      <div id="server-settings-status" style="font-size:0.82rem; color:#93c5fd; text-align:center; min-height:1.2em;"></div>
-      <button id="btn-start">接続してスタート</button>
-    </div>
   </div>
 </div>
 
@@ -422,7 +602,7 @@
     <div id="conn-dot" title="接続状態"></div>
     <span id="seat-label">ID -</span>
     <span id="app-version-badge">v-</span>
-    <span id="second-url-label" style="display:none; margin-left:auto; font-size:0.75rem; color:#aaa; user-select:all;"></span>
+    <span id="second-url-label"></span>
   </div>
   <div id="toolbar">
     <div id="toolbar-center">
@@ -432,7 +612,7 @@
     </div>
     <!-- カラーパレット（buildToolbarFromSettingsで動的生成） -->
     <div class="toolbar-sep" id="sep-before-btns"></div>
-    <button class="tool-btn" id="btn-eraser">消しゴム</button>
+    <button class="tool-btn" id="btn-eraser">消しゴム<span id="eraser-countdown-label" aria-live="polite"></span></button>
     <div class="toolbar-sep"></div>
     <button class="tool-btn" id="btn-undo">１つ戻る</button>
   </div>
@@ -467,6 +647,12 @@ let seatId = null;
 let playerName = '';
 let socket = null;
 let serverUrl = '';
+const startupParams = new URLSearchParams(location.search);
+const startupShowJudgeOverlay = (() => {
+  if (!startupParams.has('showJudgeOverlay')) return null;
+  const value = String(startupParams.get('showJudgeOverlay') || '').toLowerCase();
+  return !(value === '0' || value === 'false' || value === 'off');
+})();
 
 const setupModal = document.getElementById('setup-modal');
 const main       = document.getElementById('main');
@@ -536,6 +722,8 @@ document.getElementById('btn-start').addEventListener('click', () => {
   localStorage.setItem('kakimoni_vis_eraser',  visEraser  ? '1' : '0');
   const visSecond  = document.getElementById('vis-second').checked;
   localStorage.setItem('kakimoni_vis_second',  visSecond  ? '1' : '0');
+  const visJudgeOverlay = document.getElementById('vis-judge-overlay').checked;
+  localStorage.setItem('kakimoni_vis_judge_overlay', visJudgeOverlay ? '1' : '0');
   document.getElementById('btn-undo').style.display    = visUndo    ? '' : 'none';
   document.getElementById('btn-clear').style.display   = visClear   ? '' : 'none';
   document.getElementById('btn-confirm').style.display = visConfirm ? '' : 'none';
@@ -581,6 +769,7 @@ function buildClientSettingsPayload() {
     visConfirm: document.getElementById('vis-confirm').checked,
     visEraser: document.getElementById('vis-eraser').checked,
     visSecond: document.getElementById('vis-second').checked,
+    showJudgeOverlay: document.getElementById('vis-judge-overlay').checked,
   };
 }
 
@@ -630,12 +819,14 @@ function applyClientSettingsPayload(settings) {
   document.getElementById('vis-confirm').checked = boolOrDefault(settings.visConfirm, true);
   document.getElementById('vis-eraser').checked = boolOrDefault(settings.visEraser, true);
   document.getElementById('vis-second').checked = boolOrDefault(settings.visSecond, true);
+  document.getElementById('vis-judge-overlay').checked = boolOrDefault(settings.showJudgeOverlay, true);
 
   localStorage.setItem('kakimoni_vis_undo', document.getElementById('vis-undo').checked ? '1' : '0');
   localStorage.setItem('kakimoni_vis_clear', document.getElementById('vis-clear').checked ? '1' : '0');
   localStorage.setItem('kakimoni_vis_confirm', document.getElementById('vis-confirm').checked ? '1' : '0');
   localStorage.setItem('kakimoni_vis_eraser', document.getElementById('vis-eraser').checked ? '1' : '0');
   localStorage.setItem('kakimoni_vis_second', document.getElementById('vis-second').checked ? '1' : '0');
+  localStorage.setItem('kakimoni_vis_judge_overlay', document.getElementById('vis-judge-overlay').checked ? '1' : '0');
 }
 
 function setServerSettingsStatus(msg, isError = false) {
@@ -717,13 +908,12 @@ document.getElementById('btn-save-server-settings').addEventListener('click', as
   // 確認ダイアログ要素を動的生成
   const confirmDlg = document.createElement('div');
   confirmDlg.id = 'back-confirm-dlg';
-  confirmDlg.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;align-items:center;justify-content:center;';
   confirmDlg.innerHTML = `
-    <div style="background:#1e1e2e;border:2px solid #4a4a8a;border-radius:16px;padding:28px 36px;text-align:center;">
-      <div style="color:#eee;font-size:1.2rem;margin-bottom:20px;">設定画面に戻りますか？</div>
-      <div style="display:flex;gap:14px;justify-content:center;">
-        <button id="back-confirm-yes" style="padding:10px 28px;background:#7c3aed;border:none;border-radius:10px;color:#fff;font-size:1rem;cursor:pointer;">戻る</button>
-        <button id="back-confirm-no"  style="padding:10px 28px;background:#475569;border:none;border-radius:10px;color:#fff;font-size:1rem;cursor:pointer;">キャンセル</button>
+    <div class="back-confirm-box">
+      <div class="back-confirm-msg">設定画面に戻りますか？</div>
+      <div class="back-confirm-actions">
+        <button id="back-confirm-yes">戻る</button>
+        <button id="back-confirm-no">キャンセル</button>
       </div>
     </div>`;
   document.body.appendChild(confirmDlg);
@@ -785,14 +975,52 @@ let activeTool = 'pen'; // 'pen' | 'eraser'
 let penColor   = '#ffffff';
 let penSize    = 8;
 let judgeColorMode = false;
+let judgeFillLayerMode = 'over';
 let judging        = false;
 let isDrawing  = false;
-let activePointerId = null;
-let ignoreTouchUntil = 0;
 let lockDarkness = 65;
 let currentStroke = null; // 現在のストローク {color, size, tool, points:[]}
+let activePointerId = null; // 同時入力を防ぐため、描画中のポインターを1本に制限
+let ignoreTouchUntil = 0;
+let pendingStrokePoint = null;
+let strokePointRafId = 0;
 let clientLabelConfig = null;
 let clientLabelName   = '';
+
+function flushPendingStrokePoint(force = false) {
+  if (!pendingStrokePoint) {
+    if (force && strokePointRafId) {
+      cancelAnimationFrame(strokePointRafId);
+      strokePointRafId = 0;
+    }
+    return;
+  }
+  if (force && strokePointRafId) {
+    cancelAnimationFrame(strokePointRafId);
+    strokePointRafId = 0;
+  }
+  if (socket && socket.connected) {
+    socket.emit('stroke-point', { point: pendingStrokePoint });
+  }
+  pendingStrokePoint = null;
+}
+
+function scheduleStrokePointEmit(point) {
+  pendingStrokePoint = point;
+  if (strokePointRafId) return;
+  strokePointRafId = requestAnimationFrame(() => {
+    strokePointRafId = 0;
+    flushPendingStrokePoint();
+  });
+}
+
+function normalizeJudgeFillLayerMode(mode) {
+  return String(mode || '').trim().toLowerCase() === 'under' ? 'under' : 'over';
+}
+
+function applyJudgeFillLayerMode(mode) {
+  judgeFillLayerMode = normalizeJudgeFillLayerMode(mode);
+}
 
 function applyClientNameLabel() {
   const el = document.getElementById('canvas-name-label');
@@ -930,36 +1158,46 @@ function emitStrokeStart(stroke) {
     size: stroke.size,
     srcW: stroke.srcW,
     srcH: stroke.srcH,
-    points: stroke.points.map((p) => ({ x: p.x, y: p.y })),
+    points: (stroke.points || []).map((p) => ({ x: p.x, y: p.y })),
   });
 }
 
-function endActiveStroke() {
+function endActiveStroke(e) {
   if (!isDrawing || !currentStroke) {
     isDrawing = false;
     activePointerId = null;
     return;
   }
   isDrawing = false;
-  activePointerId = null;
+  flushPendingStrokePoint(true);
   undoStack.push([...strokeHistory]);
   strokeHistory.push(currentStroke);
   if (socket && socket.connected) socket.emit('stroke-end');
   const wasEraser = currentStroke.tool === 'eraser';
   currentStroke = null;
+  if (e && canvas.hasPointerCapture(e.pointerId)) {
+    try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
+  }
+  activePointerId = null;
   if (wasEraser) {
     clearTimeout(eraserAutoRevertTimer);
     startEraserRing();
-    eraserAutoRevertTimer = setTimeout(revertToPen, 1500);
+    startEraserCountdown();
+    eraserAutoRevertTimer = setTimeout(revertToPen, ERASER_AUTO_REVERT_MS);
   }
 }
 
-function startStrokeAt(e, pt) {
+function onPointerDown(e) {
+  if (isLocked) return;
+  if (e.pointerType === 'touch' && Date.now() < ignoreTouchUntil) return;
+  if (activePointerId !== null && e.pointerId !== activePointerId) return;
+  if (isDrawing) return;
   e.preventDefault();
-  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
-  isDrawing = true;
   activePointerId = e.pointerId;
   if (e.pointerType === 'pen') ignoreTouchUntil = Date.now() + 800;
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+  isDrawing = true;
+  const pt = getXY(e);
   const cw = canvas.width  / (window.devicePixelRatio || 1);
   const ch = canvas.height / (window.devicePixelRatio || 1);
   currentStroke = {
@@ -974,24 +1212,16 @@ function startStrokeAt(e, pt) {
   emitStrokeStart(currentStroke);
 }
 
-function onPointerDown(e) {
-  if (isLocked) return;
-  if (e.pointerType === 'touch' && Date.now() < ignoreTouchUntil) return;
-  if (isDrawing && e.pointerId !== activePointerId) return;
-  if (isDrawing) return;
-  startStrokeAt(e, getXY(e));
-}
-
 function onPointerMove(e) {
-  if (isLocked || !isDrawing || !currentStroke) return;
-  if (e.pointerId !== activePointerId) return;
+  if (isLocked || e.pointerId !== activePointerId) return;
+  if (!isDrawing || !currentStroke) return;
   e.preventDefault();
   const pt = getXY(e);
-  const prev = currentStroke.points[currentStroke.points.length - 1];
-  if (prev && Math.hypot(pt.x - prev.x, pt.y - prev.y) > strokeJumpLimit(currentStroke)) {
-    endActiveStroke();
+  const last = currentStroke.points[currentStroke.points.length - 1];
+  if (last && Math.hypot(pt.x - last.x, pt.y - last.y) > strokeJumpLimit(currentStroke)) {
+    endActiveStroke(e);
     if (isLocked) return;
-    startStrokeAt(e, pt);
+    onPointerDown(e);
     return;
   }
   currentStroke.points.push(pt);
@@ -1000,9 +1230,7 @@ function onPointerMove(e) {
   if (pts.length >= 2) {
     const prev = pts[pts.length - 2];
     const curr = pts[pts.length - 1];
-    if (socket && socket.connected) {
-      socket.emit('stroke-point', { point: pt });
-    }
+    scheduleStrokePointEmit(pt);
     ctx.save();
     if (currentStroke.tool === 'eraser') {
       ctx.globalCompositeOperation = 'destination-out';
@@ -1031,13 +1259,17 @@ function onPointerMove(e) {
 function onPointerUp(e) {
   if (e.pointerId !== activePointerId) return;
   if (e.pointerType === 'pen') ignoreTouchUntil = Date.now() + 800;
-  endActiveStroke();
+  endActiveStroke(e);
 }
 
 // ====================================================
 // ツールバー操作
 // ====================================================
+const ERASER_AUTO_REVERT_MS = 1500;
+const ERASER_COUNTDOWN_UPDATE_MS = 100;
 let eraserAutoRevertTimer = null;
+let eraserCountdownInterval = null;
+let eraserAutoRevertDeadline = 0;
 function startEraserRing() {
   btnEraser.classList.remove('counting');
   void btnEraser.offsetWidth;
@@ -1047,7 +1279,35 @@ function startEraserRing() {
 function stopEraserRing() {
   btnEraser.classList.remove('counting');
 }
+function updateEraserCountdown(msLeft) {
+  if (!eraserCountdownLabel) return;
+  const sec = Math.max(0, msLeft) / 1000;
+  eraserCountdownLabel.textContent = `あと${sec.toFixed(1)}秒でペンに戻ります`;
+}
+function startEraserCountdown() {
+  stopEraserCountdown();
+  eraserAutoRevertDeadline = Date.now() + ERASER_AUTO_REVERT_MS;
+  btnEraser.classList.add('show-countdown');
+  updateEraserCountdown(ERASER_AUTO_REVERT_MS);
+  eraserCountdownInterval = setInterval(() => {
+    const left = eraserAutoRevertDeadline - Date.now();
+    if (left <= 0) {
+      stopEraserCountdown();
+      return;
+    }
+    updateEraserCountdown(left);
+  }, ERASER_COUNTDOWN_UPDATE_MS);
+}
+function stopEraserCountdown() {
+  if (eraserCountdownInterval) {
+    clearInterval(eraserCountdownInterval);
+    eraserCountdownInterval = null;
+  }
+  btnEraser.classList.remove('show-countdown');
+  if (eraserCountdownLabel) eraserCountdownLabel.textContent = '';
+}
 function revertToPen() {
+  stopEraserCountdown();
   stopEraserRing();
   const firstColor = document.querySelector('.color-btn');
   if (firstColor) {
@@ -1062,10 +1322,12 @@ function revertToPen() {
 const btnEraser = document.getElementById('btn-eraser');
 const btnClear  = document.getElementById('btn-clear');
 const btnUndo   = document.getElementById('btn-undo');
+const eraserCountdownLabel = document.getElementById('eraser-countdown-label');
 
 
 btnEraser.addEventListener('click', () => {
   clearTimeout(eraserAutoRevertTimer);
+  stopEraserCountdown();
   stopEraserRing();
   activeTool = 'eraser';
   btnEraser.classList.add('active-tool');
@@ -1119,6 +1381,7 @@ btnUndo.addEventListener('click', () => {
 document.querySelectorAll('.color-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     clearTimeout(eraserAutoRevertTimer);
+    stopEraserCountdown();
     stopEraserRing();
     document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
@@ -1363,6 +1626,10 @@ renderSetupPalette();
   document.getElementById('vis-confirm').checked = load('kakimoni_vis_confirm');
   document.getElementById('vis-eraser').checked  = load('kakimoni_vis_eraser');
   document.getElementById('vis-second').checked  = load('kakimoni_vis_second');
+  document.getElementById('vis-judge-overlay').checked = load('kakimoni_vis_judge_overlay');
+  if (startupShowJudgeOverlay !== null) {
+    document.getElementById('vis-judge-overlay').checked = startupShowJudgeOverlay;
+  }
 })();
 
 // ツールバーをパレット設定から動的に構築（スタート時に呼ぶ）
@@ -1483,12 +1750,21 @@ function connectSocket() {
   socket.on('show-overlay', ({ imageUrl }) => {
     if (!imageUrl) return;
     const isFill = /fill/i.test(imageUrl.split('/').pop());
+    const showJudgeOverlay = !!document.getElementById('vis-judge-overlay').checked;
+    if (!showJudgeOverlay && !isFill) return;
     if (isFill) {
       judging = true;
-      inner.style.backgroundImage = `url(${imageUrl})`;
-      inner.style.backgroundSize = '100% 100%';
-      judgeOverlay.classList.remove('show');
-      judgeImg.src = '';
+      if (judgeFillLayerMode === 'over') {
+        inner.style.backgroundImage = '';
+        judgeImg.src = imageUrl;
+        judgeImg.className = 'overlay-fill';
+        judgeOverlay.classList.add('show');
+      } else {
+        inner.style.backgroundImage = `url(${imageUrl})`;
+        inner.style.backgroundSize = '100% 100%';
+        judgeOverlay.classList.remove('show');
+        judgeImg.src = '';
+      }
       redrawAll();
     } else {
       judging = false;
@@ -1517,6 +1793,10 @@ function connectSocket() {
     judgeColorMode = enabled;
     redrawAll();
   });
+  socket.on('judge-fill-layer-mode', ({ mode }) => {
+    applyJudgeFillLayerMode(mode);
+    redrawAll();
+  });
 
   // 選択肢画像
   socket.on('show-choice', ({ imageUrl }) => {
@@ -1532,6 +1812,13 @@ function connectSocket() {
     const ci = document.getElementById('choice-img');
     if (cl) cl.classList.remove('show');
     if (ci) ci.src = '';
+  });
+
+  socket.on('full-state', (state) => {
+    if (typeof state.judgeFillLayerMode !== 'undefined') {
+      applyJudgeFillLayerMode(state.judgeFillLayerMode);
+      redrawAll();
+    }
   });
 
   // 問題更新

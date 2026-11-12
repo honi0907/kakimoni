@@ -35,6 +35,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 #conn-dot { font-size: 0.78rem; color: var(--muted); }
 #conn-dot.ok { color: var(--green); }
 .spacer { flex: 1; }
+.hidden-by-default { display: none; }
 #group-sel-input {
   width: 80px; padding: 4px 8px; background: var(--surf2);
   border: 1px solid var(--border2); color: var(--text);
@@ -62,7 +63,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 #seats-grid {
   display: flex; gap: 5px; overflow-x: auto; overflow-y: hidden;
   flex: 1; min-height: 0; padding-bottom: 6px;
-  scrollbar-width: thin; scrollbar-color: var(--border2) transparent;
 }
 .seat-card {
   background: var(--surface); border: 1px solid var(--border);
@@ -112,7 +112,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg);
 }
 /* ctrl col section separators */
 #rp-ctrl-col > * { padding: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; }
-#ctrl-patterns { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+#ctrl-patterns { flex: 1; min-height: 0; overflow-y: auto; }
 .rp-title {
   font-size: 0.72rem; font-weight: bold; color: var(--muted); letter-spacing: 0.05em;
 }
@@ -391,6 +391,11 @@ input[type=number]:focus, input[type=text]:focus, select:focus { border-color: v
   background: var(--border2); cursor: pointer; padding: 0;
 }
 .fci-anchor-dot.active { background: var(--indigo); }
+.rp-title-with-gap { margin-bottom: 4px; }
+.fci-wrap-row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 4px; }
+.fci-align-row { display: flex; gap: 4px; align-items: center; margin-top: 4px; }
+.fci-text-bg-opacity { width: 44px; }
+.ml-6 { margin-left: 6px; }
 #free-cell-inspector.no-selection #fci-inputs,
 #free-cell-inspector.no-selection + #fci-text-section {
   opacity: 0.25; pointer-events: none;
@@ -402,7 +407,6 @@ input[type=number]:focus, input[type=text]:focus, select:focus { border-color: v
   padding: 8px 6px; background: #0a0a1a;
   border: 1px solid #2d2d4a; border-radius: 3px;
   width: 88px; flex-shrink: 0; overflow-y: auto; max-height: 100%;
-  scrollbar-width: thin; scrollbar-color: var(--border2) transparent;
 }
 #free-bg-picker-label {
   font-size: 0.65rem; color: #4b5563; white-space: nowrap;
@@ -613,8 +617,8 @@ input[type=number]:focus, input[type=text]:focus, select:focus { border-color: v
   </div>
 </div>
   <div class="spacer"></div>
-  <span class="topbar-group-label" style="display:none">グループ:</span>
-  <input type="text" id="group-sel-input" title="グループID" placeholder="例: slot1" value="slot1" style="display:none">
+  <span class="topbar-group-label hidden-by-default">グループ:</span>
+  <input type="text" id="group-sel-input" class="hidden-by-default" title="グループID" placeholder="例: slot1" value="slot1">
 </div>
 
 <!-- main -->
@@ -697,8 +701,8 @@ input[type=number]:focus, input[type=text]:focus, select:focus { border-color: v
         </div>
         <!-- テキストオーバーレイ設定パネル -->
         <div id="fci-text-section">
-          <div class="rp-title" style="margin-bottom:4px;">📝 テキストオーバーレイ</div>
-          <div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:4px;">
+          <div class="rp-title rp-title-with-gap">📝 テキストオーバーレイ</div>
+          <div class="fci-wrap-row">
             <div class="fci-group">
               <label class="fci-label" for="fci-text-color">文字色</label>
               <input type="color" id="fci-text-color" class="fci-color-inp" value="#ffffff">
@@ -706,7 +710,7 @@ input[type=number]:focus, input[type=text]:focus, select:focus { border-color: v
             <div class="fci-group">
               <label class="fci-label" for="fci-text-bg">背景色</label>
               <input type="color" id="fci-text-bg" class="fci-color-inp" value="#000000">
-              <input type="range" id="fci-text-bg-opacity" min="0" max="100" value="50" style="width:44px;" aria-label="背景色の不透明度">
+              <input type="range" id="fci-text-bg-opacity" class="fci-text-bg-opacity" min="0" max="100" value="50" aria-label="背景色の不透明度">
               <span id="fci-text-bg-opacity-val" class="fci-label">50%</span>
             </div>
             <div class="fci-group">
@@ -714,12 +718,12 @@ input[type=number]:focus, input[type=text]:focus, select:focus { border-color: v
               <input type="number" id="fci-text-size" class="fci-inp" value="48" min="8" max="400" title="フォントサイズ(1080p基準px)">
             </div>
           </div>
-          <div style="display:flex;gap:4px;align-items:center;margin-top:4px;">
+          <div class="fci-align-row">
             <span class="fci-label">縦</span>
             <button class="fci-valign-btn active" data-valign="top">上</button>
             <button class="fci-valign-btn" data-valign="center">中</button>
             <button class="fci-valign-btn" data-valign="bottom">下</button>
-            <span class="fci-label" style="margin-left:6px;">横</span>
+            <span class="fci-label ml-6">横</span>
             <button class="fci-halign-btn active" data-halign="left">左</button>
             <button class="fci-halign-btn" data-halign="center">中</button>
             <button class="fci-halign-btn" data-halign="right">右</button>
@@ -773,6 +777,14 @@ let socket = null;
 let layoutRows = 2, layoutCols = 3;
 let layoutKeepRatio = false;
 let cellAssignments = [];
+const gridCellResizeObservers = [];
+
+function clearGridCellResizeObservers() {
+  while (gridCellResizeObservers.length) {
+    const ro = gridCellResizeObservers.pop();
+    try { ro.disconnect(); } catch {}
+  }
+}
 
 const LAYOUT_PRESETS = [
   { label:'1x1', rows:1, cols:1 },
@@ -873,6 +885,48 @@ function clearLcJudgeOverlay(seatId) {
   }
 }
 
+function findDuplicateSeatAssignments() {
+  const duplicates = [];
+  const seen = new Set();
+  const addSeatId = (seatId) => {
+    const normalized = String(seatId || '').trim();
+    if (!normalized) return;
+    if (seen.has(normalized)) {
+      if (!duplicates.includes(normalized)) duplicates.push(normalized);
+      return;
+    }
+    seen.add(normalized);
+  };
+
+  if (layoutMode === 'grid') {
+    cellAssignments.forEach(addSeatId);
+  } else {
+    freeCells.forEach((cell) => {
+      if (!cell.textOnly) addSeatId(cell.seatId);
+    });
+  }
+
+  return duplicates;
+}
+
+function isSeatIdAssignedElsewhere(seatId, currentCellId = null, currentIndex = null) {
+  const normalized = String(seatId || '').trim();
+  if (!normalized) return false;
+
+  if (layoutMode === 'grid') {
+    return cellAssignments.some((assignedId, index) => index !== currentIndex && String(assignedId || '').trim() === normalized);
+  }
+
+  return freeCells.some((cell) => {
+    if (cell.id === currentCellId || cell.textOnly) return false;
+    return String(cell.seatId || '').trim() === normalized;
+  });
+}
+
+function showDuplicateSeatAlert(seatId) {
+  window.alert('同じIDは1つのレイアウト内に複数配置できません。\nID ' + seatId + ' は既に割り当て済みです。');
+}
+
 const seatPreviewCanvases = new Map(); // seatId -> Set<HTMLCanvasElement>
 function addPreviewCanvas(seatId, canvas) {
   if (!seatPreviewCanvases.has(seatId)) seatPreviewCanvases.set(seatId, new Set());
@@ -892,7 +946,18 @@ function fitPreviewCanvas(canvas, cellEl) {
   canvas.style.left   = Math.round((cw - w) / 2) + 'px';
   canvas.style.top    = Math.round((ch - h) / 2) + 'px';
 }
-function drawPreviewCanvas(previewCanvas, seat) {
+function drawPreviewCanvas(previewCanvas, seat, activeStroke = null) {
+  if (previewCanvas.dataset.previewMode === 'free') {
+    const host = previewCanvas.parentElement;
+    const hostW = host ? host.clientWidth : 0;
+    const hostH = host ? host.clientHeight : 0;
+    if (hostW > 0 && hostH > 0) {
+      previewCanvas.style.left = '0px';
+      previewCanvas.style.top = '0px';
+      previewCanvas.style.width = hostW + 'px';
+      previewCanvas.style.height = hostH + 'px';
+    }
+  }
   const w = previewCanvas.offsetWidth, h = previewCanvas.offsetHeight;
   if (!w || !h) return;
   const dpr = window.devicePixelRatio || 1;
@@ -916,6 +981,7 @@ function drawPreviewCanvas(previewCanvas, seat) {
   }
   const inv = lcJudgeColorMode && seat.judging;
   for (const s of seat.strokes) drawStrokeOnCanvas(previewCanvas, pctx, s, inv);
+  if (activeStroke) drawStrokeOnCanvas(previewCanvas, pctx, activeStroke, inv);
 }
 function updateSeatPreviews(seat) {
   const previews = seatPreviewCanvases.get(seat.id);
@@ -931,6 +997,10 @@ function updateSeatPreviewsSegment(seat, stroke) {
   const inv = lcJudgeColorMode && seat.judging;
   for (const c of [...previews]) {
     if (!c.isConnected) { previews.delete(c); continue; }
+    if (stroke?.tool === 'eraser') {
+      drawPreviewCanvas(c, seat, stroke);
+      continue;
+    }
     const pctx = c.getContext('2d');
     drawStrokeSegment(c, pctx, stroke, inv);
   }
@@ -1030,6 +1100,7 @@ function buildGridPreview() {
   cellAssignments = Array.from({ length: total }, (_, i) => cellAssignments[i] !== undefined ? cellAssignments[i] : null);
 
   const preview = document.getElementById('grid-preview');
+  clearGridCellResizeObservers();
   preview.style.gridTemplateRows    = 'repeat(' + layoutRows + ', 1fr)';
   preview.style.gridTemplateColumns = 'repeat(' + layoutCols + ', 1fr)';
   preview.innerHTML = '';
@@ -1042,8 +1113,8 @@ function buildGridPreview() {
 
     const previewC = document.createElement('canvas');
     previewC.style.cssText = layoutKeepRatio
-      ? 'position:absolute;pointer-events:none;'
-      : 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
+      ? 'position:absolute;pointer-events:none;background:#fff;'
+      : 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;background:#fff;';
     cell.appendChild(previewC);
 
     const lbl = document.createElement('span');
@@ -1071,20 +1142,42 @@ function buildGridPreview() {
       sel.appendChild(opt);
     }
     sel.addEventListener('change', () => {
+      const nextSeatId = sel.value || null;
+      if (nextSeatId && isSeatIdAssignedElsewhere(nextSeatId, null, i)) {
+        showDuplicateSeatAlert(nextSeatId);
+        sel.value = curId || '';
+        return;
+      }
       removePreviewCanvas(previewC);
       previewC.getContext('2d').clearRect(0, 0, previewC.width, previewC.height);
-      cellAssignments[i] = sel.value || null;
-      lbl.textContent = sel.value ? ('ID ' + sel.value) : '-';
-      cell.classList.toggle('assigned', !!sel.value);
-      if (sel.value) {
-        addPreviewCanvas(sel.value, previewC);
-        const s = seats.get(sel.value);
+      cellAssignments[i] = nextSeatId;
+      lbl.textContent = nextSeatId ? ('ID ' + nextSeatId) : '-';
+      cell.classList.toggle('assigned', !!nextSeatId);
+      if (nextSeatId) {
+        addPreviewCanvas(nextSeatId, previewC);
+        const s = seats.get(nextSeatId);
         if (s) requestAnimationFrame(() => {
           if (layoutKeepRatio) fitPreviewCanvas(previewC, cell);
           drawPreviewCanvas(previewC, s);
         });
       }
     });
+
+    const syncGridCellPreview = () => {
+      if (!cell.isConnected || !previewC.isConnected) return;
+      if (layoutKeepRatio) fitPreviewCanvas(previewC, cell);
+      const seatId = cellAssignments[i];
+      if (!seatId) return;
+      const seat = seats.get(seatId);
+      if (seat) drawPreviewCanvas(previewC, seat);
+    };
+
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(syncGridCellPreview);
+    });
+    ro.observe(cell);
+    gridCellResizeObservers.push(ro);
+
     cell.appendChild(sel);
     preview.appendChild(cell);
   }
@@ -1234,7 +1327,8 @@ function renderFreeCell(cell) {
   el.style.height = cell.h + '%';
 
   const previewC = document.createElement('canvas');
-  previewC.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
+  previewC.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;background:#fff;';
+  previewC.dataset.previewMode = 'free';
   el.appendChild(previewC);
   cell._previewCanvas = previewC;
   if (cell.seatId) {
@@ -1282,8 +1376,14 @@ function renderFreeCell(cell) {
 
     sel.addEventListener('change', (e) => {
       e.stopPropagation();
+      const nextSeatId = sel.value || null;
+      if (nextSeatId && isSeatIdAssignedElsewhere(nextSeatId, cell.id, null)) {
+        showDuplicateSeatAlert(nextSeatId);
+        sel.value = cell.seatId || '';
+        return;
+      }
       removePreviewCanvas(previewC);
-      cell.seatId = sel.value || null;
+      cell.seatId = nextSeatId;
       el.classList.toggle('fc-has-seat', !!cell.seatId);
       if (cell.seatId) {
         addPreviewCanvas(String(cell.seatId), previewC);
@@ -1428,6 +1528,17 @@ function renderFreeCell(cell) {
   canvas.appendChild(el);
 }
 
+function refreshFreeCellVisual(cell, el) {
+  if (!cell || !el) return;
+  if (cell._previewCanvas && cell.seatId) {
+    const seat = seats.get(String(cell.seatId));
+    if (seat) {
+      drawPreviewCanvas(cell._previewCanvas, seat);
+    }
+  }
+  applyFreeCellTextOverlay(el, cell);
+}
+
 function startFreeMove(e, cell, el) {
   const rect = getFreeCanvasRect();
   const sx = e.clientX, sy = e.clientY;
@@ -1499,6 +1610,7 @@ function startFreeResize(e, cell, dir, el) {
     el.style.left = cell.x+'%'; el.style.top = cell.y+'%';
     el.style.width = cell.w+'%'; el.style.height = cell.h+'%';
     updatePosBadge(el, cell);
+    refreshFreeCellVisual(cell, el);
     if (selectedCellId === cell.id) updateInspector(cell);
   };
   const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
@@ -1662,6 +1774,7 @@ for (const key of ['x','y','w','h']) {
       el.style.height = cell.h + '%';
       updatePosBadge(el, cell);
       updateAnchorHandle(el);
+      refreshFreeCellVisual(cell, el);
     }
     updateInspector(cell);
   });
@@ -1812,6 +1925,11 @@ document.getElementById('btn-apply').addEventListener('click', () => {
         bgUrl: freeBgUrl || null,
       };
     }
+  }
+  const duplicates = findDuplicateSeatAssignments();
+  if (duplicates.length) {
+    window.alert('同じIDは1つのレイアウト内に複数配置できません。\n重複ID: ' + duplicates.join(', '));
+    return;
   }
   for (const g of selectedGroups) {
     socket.emit('display-layout', buildPayload(g));
@@ -2056,21 +2174,33 @@ function drawStrokeOnCanvas(canvas, ctx, stroke, inv = false) {
   ctx.stroke(); ctx.restore();
 }
 
+function updateSeatCanvasWrapBg(seat) {
+  if (!seat) return;
+  const wrap = document.getElementById('lc-cw-' + seat.id);
+  if (!wrap) return;
+
+  if (seat.fillImageUrl && seat.bgImageUrl) {
+    wrap.style.backgroundImage = `url('${seat.bgImageUrl}'), url('${seat.fillImageUrl}')`;
+    wrap.style.backgroundSize = 'cover, 100% 100%';
+  } else if (seat.fillImageUrl) {
+    wrap.style.backgroundImage = `url('${seat.fillImageUrl}')`;
+    wrap.style.backgroundSize = '100% 100%';
+  } else if (seat.bgImageUrl) {
+    wrap.style.backgroundImage = `url('${seat.bgImageUrl}')`;
+    wrap.style.backgroundSize = 'cover';
+  } else {
+    wrap.style.backgroundImage = '';
+    wrap.style.backgroundSize = '';
+  }
+  wrap.style.backgroundRepeat = 'no-repeat';
+  wrap.style.backgroundPosition = 'center';
+}
+
 function redrawCanvas(seat) {
   const dpr = window.devicePixelRatio || 1;
   const w = seat.canvas.width / dpr, h = seat.canvas.height / dpr;
   seat.ctx.clearRect(0, 0, w, h);
-  seat.ctx.save(); seat.ctx.globalCompositeOperation = 'source-over';
-  seat.ctx.fillStyle = '#ffffff'; seat.ctx.fillRect(0, 0, w, h); seat.ctx.restore();
-  if (seat.bgImage) {
-    const img = seat.bgImage;
-    const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight);
-    const dw = img.naturalWidth * scale, dh = img.naturalHeight * scale;
-    seat.ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
-  }
-  if (seat.fillImg) {
-    seat.ctx.drawImage(seat.fillImg, 0, 0, w, h);
-  }
+  updateSeatCanvasWrapBg(seat);
   const inv = lcJudgeColorMode && seat.judging;
   for (const s of seat.strokes) drawStrokeOnCanvas(seat.canvas, seat.ctx, s, inv);
   updateSeatPreviews(seat);
@@ -2099,7 +2229,7 @@ function createSeatCard(id, seatData) {
 
   const canvas = document.getElementById('lc-cv-' + id);
   const ctx    = canvas.getContext('2d');
-  const seat   = { id, canvas, ctx, strokes: [], bgImage: null, bgImageUrl: '', fillImg: null, judgeOverlayUrl: null, connected: false, name: seatData.name || id };
+  const seat   = { id, canvas, ctx, strokes: [], bgImage: null, bgImageUrl: '', fillImg: null, fillImageUrl: '', judgeOverlayUrl: null, connected: false, name: seatData.name || id };
   seats.set(id, seat);
 
   const ro = new ResizeObserver(() => {
@@ -2140,11 +2270,10 @@ function updateSeat(seatData) {
     seat.bgImageUrl = newBg;
     if (newBg) {
       const img = new Image(); img.onload = () => { seat.bgImage = img; redrawCanvas(seat); }; img.src = newBg;
-    } else { seat.bgImage = null; }
+    } else { seat.bgImage = null; redrawCanvas(seat); }
   }
-  if (seatData.strokes && seatData.strokes.length > 0) {
-    seat.strokes = seatData.strokes.slice(); redrawCanvas(seat);
-  }
+  seat.strokes = (seatData.strokes || []).slice();
+  redrawCanvas(seat);
 }
 
 // ================================================================
@@ -2198,9 +2327,16 @@ function connect() {
     const seat = seats.get(String(seatId));
     if (!seat) return;
     seat.strokes = []; currentStrokes.delete(String(seatId));
-    seat.judging = false; seat.fillImg = null;
+    seat.judging = false; seat.fillImg = null; seat.fillImageUrl = '';
     redrawCanvas(seat);
     clearLcJudgeOverlay(seatId);
+  });
+  socket.on('canvas-cleared-strokes', ({ seatId }) => {
+    const seat = seats.get(String(seatId));
+    if (!seat) return;
+    seat.strokes = [];
+    currentStrokes.delete(String(seatId));
+    redrawCanvas(seat);
   });
   socket.on('seat-strokes-updated', ({ seatId, strokes }) => {
     const seat = seats.get(String(seatId));
@@ -2221,11 +2357,11 @@ function connect() {
       seat.judging = true;
       clearLcJudgeOverlay(seatId);
       const img = new Image();
-      img.onload = () => { seat.fillImg = img; redrawCanvas(seat); updateSeatPreviews(seat); };
+      img.onload = () => { seat.fillImg = img; seat.fillImageUrl = imageUrl; redrawCanvas(seat); updateSeatPreviews(seat); };
       img.src = imageUrl;
     } else {
       seat.judging = true;
-      seat.fillImg = null; redrawCanvas(seat); updateSeatPreviews(seat);
+      seat.fillImg = null; seat.fillImageUrl = ''; redrawCanvas(seat); updateSeatPreviews(seat);
       applyLcJudgeOverlay(seatId, imageUrl);
     }
   });
@@ -2233,7 +2369,7 @@ function connect() {
     const clearOne = (id) => {
       const seat = seats.get(String(id));
       if (!seat) return;
-      seat.judging = false; seat.fillImg = null; redrawCanvas(seat); updateSeatPreviews(seat);
+      seat.judging = false; seat.fillImg = null; seat.fillImageUrl = ''; redrawCanvas(seat); updateSeatPreviews(seat);
       clearLcJudgeOverlay(id);
     };
     if (data?.seatId) clearOne(data.seatId);

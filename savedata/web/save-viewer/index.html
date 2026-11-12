@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<title>KakiMoni Save Viewer</title>
+<style>
+  :root {
+    --thumb-min: 180px;
+    --thumb-min-compact: 92px;
+    --bg-1: #09111f;
+    --bg-2: #101a2c;
+    --panel: rgba(9, 17, 31, 0.88);
+    --panel-strong: #13203a;
+    --line: #27415f;
+    --line-soft: #1a2d45;
+    --text: #e5eefc;
+    --muted: #96a9c6;
+    --accent-strong: #1d7cf2;
+    --ok: #7dd3a7;
+    --warn: #ffd166;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Segoe UI", "Hiragino Sans", sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(circle at top left, rgba(77, 163, 255, 0.16), transparent 28%),
+      linear-gradient(180deg, var(--bg-2) 0%, var(--bg-1) 100%);
+  }
+
+  .wrap {
+    width: min(100%, 1800px);
+    margin: 0 auto;
+    padding: 16px;
+  }
+
+  .toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    margin-bottom: 16px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: rgba(7, 12, 22, 0.92);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+
+  .toolbar-top,
+  .toolbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .toolbar-row {
+    margin-top: 12px;
+  }
+
+  .title {
+    margin-right: auto;
+  }
+
+  .title h1 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+
+  .title p {
+    margin: 4px 0 0;
+    font-size: 0.84rem;
+    color: var(--muted);
+  }
+
+  .btn {
+    appearance: none;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 8px 12px;
+    background: linear-gradient(180deg, #1b2c47 0%, #13213a 100%);
+    color: var(--text);
+    font-size: 0.84rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .btn.primary {
+    border-color: #5aa7ff;
+    background: linear-gradient(180deg, #3f98fb 0%, #2179ef 100%);
+  }
+
+  .btn.ghost {
+    background: #101a2c;
+  }
+
+  .field {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--line-soft);
+    border-radius: 10px;
+    background: rgba(12, 20, 36, 0.86);
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .field input[type="number"] {
+    width: 72px;
+  }
+
+  .field input[type="number"],
+  .field input[type="range"] {
+    accent-color: var(--accent-strong);
+  }
+
+  .field input,
+  .field select {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #0c1626;
+    color: var(--text);
+    padding: 4px 8px;
+  }
+
+  .field.row-layout {
+    gap: 6px;
+  }
+
+  .field.row-layout input[type="text"] {
+    width: 150px;
+  }
+
+  .seat-slot-empty {
+    min-height: 0;
+    border: 1px dashed var(--line-soft);
+    border-radius: 12px;
+    background: rgba(8, 14, 24, 0.32);
+  }
+
+  .meta-toggle-group {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  body.hide-file-name .file-name {
+    display: none;
+  }
+
+  body.hide-updated .updated {
+    display: none;
+  }
+
+  body.hide-file-name.hide-updated .card-body {
+    padding: 4px 6px 5px;
+  }
+
+  .id-grid {
+    display: grid;
+    grid-template-columns: repeat(10, minmax(58px, 1fr));
+    gap: 8px;
+    flex: 1 1 520px;
+  }
+
+  .id-chip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 38px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #0e1829;
+    color: var(--text);
+    font-size: 0.82rem;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .id-chip input {
+    margin: 0;
+  }
+
+  .summary {
+    font-size: 0.84rem;
+    color: var(--ok);
+  }
+
+  .status {
+    font-size: 0.82rem;
+    color: var(--warn);
+  }
+
+  .sections {
+    display: grid;
+    gap: 10px;
+    min-height: 0;
+  }
+
+  .sections.compact-wall-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    height: calc(100vh - 18px);
+  }
+
+  .seat-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    min-height: 0;
+  }
+
+  .seat {
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel);
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .seat-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+    flex: 0 0 auto;
+  }
+
+  .seat-title {
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: #cbe0ff;
+  }
+
+  .seat-meta {
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
+
+  .thumb-grid {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 6px;
+    align-content: start;
+    justify-content: flex-start;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .seat-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 2px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .featured-latest {
+    display: grid;
+    grid-template-columns: 1fr;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .card.featured {
+    width: 100%;
+    max-width: 100%;
+    border: 2px solid #5aa7ff;
+    box-shadow: 0 0 0 1px rgba(90, 167, 255, 0.18);
+  }
+
+  .card.featured img {
+    aspect-ratio: 16 / 9;
+  }
+
+  .card.featured .tag-latest {
+    border-color: #5aa7ff;
+    background: rgba(29, 124, 242, 0.22);
+    color: #d9ebff;
+  }
+
+  .card {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--line-soft);
+    border-radius: 14px;
+    background: var(--panel-strong);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .card a {
+    color: inherit;
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .card img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: contain;
+    background: #ffffff;
+  }
+
+  .card-body {
+    padding: 6px;
+    min-width: 0;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 4px;
+    overflow: hidden;
+  }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    min-height: 18px;
+    padding: 0 6px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #0e1829;
+    color: #cfe1fb;
+    font-size: 0.62rem;
+    font-weight: 700;
+  }
+
+  .file-name {
+    word-break: break-all;
+    font-size: 0.65rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .updated {
+    margin-top: 4px;
+    font-size: 0.62rem;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .empty {
+    padding: 16px;
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+    color: var(--muted);
+    text-align: center;
+    background: rgba(7, 12, 22, 0.5);
+  }
+
+  .footer-note {
+    margin-top: 16px;
+    font-size: 0.76rem;
+    color: var(--muted);
+  }
+
+  .build-badge {
+    position: fixed;
+    right: 10px;
+    bottom: 10px;
+    z-index: 80;
+    padding: 4px 8px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(7, 12, 22, 0.82);
+    color: var(--muted);
+    font-size: 0.68rem;
+    pointer-events: none;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+
+  .controls-toggle-fab {
+    position: fixed;
+    left: 10px;
+    top: 10px;
+    z-index: 60;
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: rgba(7, 12, 22, 0.65);
+    color: var(--text);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    font-size: 0.74rem;
+    font-weight: 700;
+  }
+
+  .controls-toggle-fab:hover {
+    background: rgba(16, 26, 44, 0.82);
+  }
+
+  body.controls-hidden .toolbar {
+    display: none;
+  }
+
+  body.controls-hidden .controls-toggle-fab {
+    display: inline-flex;
+  }
+
+  body.controls-hidden .footer-note {
+    display: none;
+  }
+
+  body.controls-hidden .wrap {
+    padding-top: 8px;
+  }
+
+  body:not(.controls-hidden) .sections.compact-wall-grid {
+    height: calc(100vh - 176px);
+  }
+
+  @media (max-width: 900px) {
+    .id-grid {
+      grid-template-columns: repeat(5, minmax(58px, 1fr));
+    }
+    .sections.compact-wall-grid {
+      grid-template-columns: 1fr;
+      grid-template-rows: repeat(2, minmax(0, 1fr));
+      height: auto;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .wrap {
+      padding: 10px;
+    }
+
+    .toolbar {
+      padding: 12px;
+    }
+
+    .thumb-grid {
+      grid-template-columns: repeat(auto-fill, var(--thumb-min-compact));
+    }
+
+    body:not(.controls-hidden) .sections.compact-wall-grid,
+    body.controls-hidden .sections.compact-wall-grid {
+      grid-template-columns: 1fr;
+      grid-template-rows: none;
+      height: auto;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="toolbar">
+    <div class="toolbar-top">
+      <div class="title">
+        <h1>保存データ一覧</h1>
+        <p>savedata から読み出した画像を、そのままブラウザで一覧表示します</p>
+      </div>
+      <button id="btn-refresh" class="btn primary" type="button">再読込</button>
+      <button id="btn-hide-controls" class="btn ghost" type="button">コンパネ最小化</button>
+      <button id="btn-all" class="btn ghost" type="button">全選択</button>
+      <button id="btn-none" class="btn ghost" type="button">全解除</button>
+      <button id="btn-recent" class="btn ghost" type="button">よく使うID</button>
+    </div>
+
+    <div class="toolbar-row">
+      <div id="id-grid" class="id-grid"></div>
+    </div>
+
+    <div class="toolbar-row">
+      <label class="field">1IDあたり表示件数 <input id="max-per-seat" type="number" min="1" max="500" value="120"></label>
+      <label class="field">サムネサイズ <input id="thumb-size" type="range" min="60" max="220" step="10" value="96"><span id="thumb-size-label">96px</span></label>
+      <label class="field"><input id="live-update" type="checkbox" checked> 新規保存を即時反映</label>
+      <label class="field"><input id="auto-refresh" type="checkbox"> 15秒ごとに自動更新</label>
+      <label class="field">更新間隔(秒) <input id="auto-refresh-interval" type="number" min="2" max="120" value="15"></label>
+      <span class="field meta-toggle-group">
+        <label><input id="toggle-file-name" type="checkbox" checked> 保存名</label>
+        <label><input id="toggle-updated" type="checkbox" checked> 日付</label>
+      </span>
+    </div>
+
+    <div class="toolbar-row">
+      <label class="field row-layout">上段ID <input id="layout-top" type="text" value="1,2,3,4,5"></label>
+      <label class="field row-layout">下段ID <input id="layout-bottom" type="text" value="6,7,8,9,10"></label>
+      <button id="btn-apply-layout" class="btn ghost" type="button">行配置を適用</button>
+    </div>
+
+    <div class="toolbar-row">
+      <div id="summary" class="summary">合計表示件数: 0</div>
+      <div id="status" class="status">準備完了</div>
+    </div>
+  </section>
+
+  <main id="sections" class="sections"></main>
+
+  <div class="footer-note">SV build: 2026-09-07-f2</div>
+</div>
+<button id="btn-show-controls" class="controls-toggle-fab" type="button" aria-label="コンパネ表示">表示</button>
+<div id="build-badge" class="build-badge">SV 2026-09-07-f2</div>
+
+<script>
+  const DEFAULT_IDS = [1,2,3,4,5,6,7,8,9,10];
+  const SV_BUILD = '2026-09-07-f2';
+  const sectionsEl = document.getElementById('sections');
+  const summaryEl = document.getElementById('summary');
+  const statusEl = document.getElementById('status');
+  const idGridEl = document.getElementById('id-grid');
+  const maxPerSeatEl = document.getElementById('max-per-seat');
+  const thumbSizeEl = document.getElementById('thumb-size');
+  const thumbSizeLabelEl = document.getElementById('thumb-size-label');
+  const liveUpdateEl = document.getElementById('live-update');
+  const autoRefreshEl = document.getElementById('auto-refresh');
+  const autoRefreshIntervalEl = document.getElementById('auto-refresh-interval');
+  const toggleFileNameEl = document.getElementById('toggle-file-name');
+  const toggleUpdatedEl = document.getElementById('toggle-updated');
+  const layoutTopEl = document.getElementById('layout-top');
+  const layoutBottomEl = document.getElementById('layout-bottom');
+  const btnApplyLayoutEl = document.getElementById('btn-apply-layout');
+  const btnHideControls = document.getElementById('btn-hide-controls');
+  const btnShowControls = document.getElementById('btn-show-controls');
+
+  const AUTO_REFRESH_ENABLED_KEY = 'kakimoni_sv_autorefresh_enabled_v2';
+  const AUTO_REFRESH_INTERVAL_KEY = 'kakimoni_sv_autorefresh_interval_v2';
+  const SHOW_FILE_NAME_KEY = 'kakimoni_sv_show_file_name_v2';
+  const SHOW_UPDATED_KEY = 'kakimoni_sv_show_updated_v2';
+  const LAYOUT_TOP_KEY = 'kakimoni_sv_layout_top_v2';
+  const LAYOUT_BOTTOM_KEY = 'kakimoni_sv_layout_bottom_v2';
+  const LIVE_UPDATE_ENABLED_KEY = 'kakimoni_sv_live_update_enabled_v1';
+
+  let autoRefreshTimer = null;
+  let liveUpdateSource = null;
+  let liveUpdateReconnectTimer = null;
+  let liveUpdatePendingTimer = null;
+
+  function pad2(value) {
+    return String(value).padStart(2, '0');
+  }
+
+  function fmtSession(item) {
+    return String(item.session || 0).padStart(2, '0');
+  }
+
+  function fmtCounter(item) {
+    return String(item.counter || 0).padStart(3, '0');
+  }
+
+  function itemUpdatedAtMs(item) {
+    const ms = Number(item && item.updatedAtMs);
+    if (Number.isFinite(ms) && ms > 0) return ms;
+    const parsed = Date.parse(item && item.updatedAt);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function sortItemsNewestFirst(items) {
+    return items.slice().sort((a, b) => {
+      const byUpdated = itemUpdatedAtMs(b) - itemUpdatedAtMs(a);
+      if (byUpdated !== 0) return byUpdated;
+      if ((b.session || 0) !== (a.session || 0)) return (b.session || 0) - (a.session || 0);
+      return (b.counter || 0) - (a.counter || 0);
+    });
+  }
+
+  function setupIdGrid() {
+    idGridEl.innerHTML = '';
+    for (let seatId = 1; seatId <= 10; seatId += 1) {
+      const label = document.createElement('label');
+      label.className = 'id-chip';
+      label.innerHTML = '<input type="checkbox" name="seat-id" value="' + seatId + '">ID' + pad2(seatId);
+      idGridEl.appendChild(label);
+    }
+    setCheckedIds(DEFAULT_IDS);
+  }
+
+  function setCheckedIds(ids) {
+    const allowed = new Set(ids.map((id) => Number(id)));
+    idGridEl.querySelectorAll('input[name="seat-id"]').forEach((input) => {
+      input.checked = allowed.has(Number(input.value));
+    });
+  }
+
+  function getSelectedIds() {
+    return Array.from(idGridEl.querySelectorAll('input[name="seat-id"]:checked'))
+      .map((input) => Number(input.value))
+      .filter((value) => Number.isInteger(value))
+      .sort((a, b) => a - b);
+  }
+
+  function applyThumbSize() {
+    const size = Math.max(60, Math.min(220, parseInt(thumbSizeEl.value || '96', 10) || 96));
+    document.documentElement.style.setProperty('--thumb-min', size + 'px');
+    document.documentElement.style.setProperty('--thumb-min-compact', size + 'px');
+    thumbSizeEl.value = String(size);
+    thumbSizeLabelEl.textContent = size + 'px';
+    requestAnimationFrame(applySeatColumns);
+  }
+
+  function applySeatColumns() {
+    const thumb = Math.max(60, Math.min(220, parseInt(thumbSizeEl.value || '96', 10) || 96));
+    const gap = 6;
+    const maxColumns = 4;
+    sectionsEl.querySelectorAll('.seat .thumb-grid').forEach((grid) => {
+      const host = grid.parentElement;
+      const hostWidth = host ? host.clientWidth : 0;
+      const fit = Math.floor((hostWidth + gap) / (thumb + gap));
+      const columns = Math.max(1, Math.min(maxColumns, fit || 1));
+      grid.style.gridTemplateColumns = 'repeat(' + columns + ', minmax(0, 1fr))';
+    });
+  }
+
+  function parseRowIds(value) {
+    return String(value || '')
+      .split(',')
+      .map((v) => Number(v.trim()))
+      .filter((n) => Number.isInteger(n) && n >= 1 && n <= 10);
+  }
+
+  function uniqueInOrder(values) {
+    const seen = new Set();
+    const out = [];
+    values.forEach((value) => {
+      if (seen.has(value)) return;
+      seen.add(value);
+      out.push(value);
+    });
+    return out;
+  }
+
+  function getRowLayout(selectedIds) {
+    const selectedSet = new Set(selectedIds);
+    const top = uniqueInOrder(parseRowIds(layoutTopEl.value)).filter((id) => selectedSet.has(id)).slice(0, 5);
+    const used = new Set(top);
+    const bottomManual = uniqueInOrder(parseRowIds(layoutBottomEl.value))
+      .filter((id) => selectedSet.has(id) && !used.has(id));
+    const rest = selectedIds.filter((id) => !used.has(id) && !bottomManual.includes(id));
+    const bottom = bottomManual.concat(rest).slice(0, 5);
+
+    return {
+      top,
+      bottom,
+      visibleIds: top.concat(bottom),
+    };
+  }
+
+  function applyMetaVisibility() {
+    document.body.classList.toggle('hide-file-name', !toggleFileNameEl.checked);
+    document.body.classList.toggle('hide-updated', !toggleUpdatedEl.checked);
+    try {
+      localStorage.setItem(SHOW_FILE_NAME_KEY, toggleFileNameEl.checked ? '1' : '0');
+      localStorage.setItem(SHOW_UPDATED_KEY, toggleUpdatedEl.checked ? '1' : '0');
+    } catch {}
+  }
+
+  function persistLayoutInputs() {
+    try {
+      localStorage.setItem(LAYOUT_TOP_KEY, layoutTopEl.value);
+      localStorage.setItem(LAYOUT_BOTTOM_KEY, layoutBottomEl.value);
+    } catch {}
+  }
+
+  function loadStoredState() {
+    try {
+      const liveEnabled = localStorage.getItem(LIVE_UPDATE_ENABLED_KEY);
+      if (liveEnabled === '0') liveUpdateEl.checked = false;
+
+      autoRefreshEl.checked = localStorage.getItem(AUTO_REFRESH_ENABLED_KEY) === '1';
+
+      const interval = Number(localStorage.getItem(AUTO_REFRESH_INTERVAL_KEY));
+      if (Number.isInteger(interval) && interval >= 2 && interval <= 120) {
+        autoRefreshIntervalEl.value = String(interval);
+      }
+
+      const showFileName = localStorage.getItem(SHOW_FILE_NAME_KEY);
+      if (showFileName === '0') toggleFileNameEl.checked = false;
+      const showUpdated = localStorage.getItem(SHOW_UPDATED_KEY);
+      if (showUpdated === '0') toggleUpdatedEl.checked = false;
+
+      const top = localStorage.getItem(LAYOUT_TOP_KEY);
+      if (top) layoutTopEl.value = top;
+      const bottom = localStorage.getItem(LAYOUT_BOTTOM_KEY);
+      if (bottom) layoutBottomEl.value = bottom;
+    } catch {}
+  }
+
+  function renderCard(item, options) {
+    const opts = options || {};
+    const article = document.createElement('article');
+    article.className = 'card' + (opts.featured ? ' featured' : '');
+
+    const updated = item.updatedAt ? new Date(item.updatedAt).toLocaleString() : '-';
+    const latestTag = opts.featured ? '<span class="tag tag-latest">最新</span>' : '';
+    article.innerHTML =
+      '<a href="' + item.thumbnailUrl + '" target="_blank" rel="noopener noreferrer">' +
+        '<img loading="lazy" src="' + item.thumbnailUrl + '" alt="' + item.fileName + '">' +
+        '<div class="card-body">' +
+          '<div class="tags">' +
+            latestTag +
+            '<span class="tag">S' + fmtSession(item) + '-C' + fmtCounter(item) + '</span>' +
+            '<span class="tag">' + (item.type || '-') + '</span>' +
+          '</div>' +
+          '<div class="file-name">' + item.fileName + '</div>' +
+          '<div class="updated">' + updated + '</div>' +
+        '</div>' +
+      '</a>';
+
+    return article;
+  }
+
+  function formatStatus(message) {
+    return String(message || '') + ' · ' + SV_BUILD;
+  }
+
+  function renderSeat(seatId, seat, options) {
+    const opts = options || {};
+    const featuredMode = opts.featuredMode === true;
+    const section = document.createElement('section');
+    section.className = 'seat';
+
+    const items = sortItemsNewestFirst(Array.isArray(seat.items) ? seat.items : []);
+    section.innerHTML =
+      '<div class="seat-head">' +
+        '<div class="seat-title">ID' + pad2(seatId) + '</div>' +
+        '<div class="seat-meta">表示 ' + items.length + '件 / 全' + (seat.totalCount || 0) + '件</div>' +
+      '</div>';
+
+    if (items.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = '保存データがありません';
+      section.appendChild(empty);
+      return section;
+    }
+
+    const seatBody = document.createElement('div');
+    seatBody.className = 'seat-body';
+
+    if (featuredMode) {
+      seatBody.classList.add('has-featured');
+      const featuredWrap = document.createElement('div');
+      featuredWrap.className = 'featured-latest';
+      featuredWrap.appendChild(renderCard(items[0], { featured: true }));
+      seatBody.appendChild(featuredWrap);
+
+      if (items.length > 1) {
+        const grid = document.createElement('div');
+        grid.className = 'thumb-grid';
+        items.slice(1).forEach((item) => {
+          grid.appendChild(renderCard(item));
+        });
+        seatBody.appendChild(grid);
+      }
+    } else {
+      const grid = document.createElement('div');
+      grid.className = 'thumb-grid';
+      items.forEach((item) => {
+        grid.appendChild(renderCard(item));
+      });
+      seatBody.appendChild(grid);
+    }
+
+    section.appendChild(seatBody);
+    return section;
+  }
+
+  function renderGallery(data) {
+    const selectedSeatIds = Array.isArray(data.seatIds) ? data.seatIds : [];
+    const bySeat = data.bySeat || {};
+    const rowLayout = getRowLayout(selectedSeatIds);
+
+    sectionsEl.innerHTML = '';
+
+    const rows = [rowLayout.top, rowLayout.bottom].filter((ids) => ids.length > 0);
+    if (rows.length === 0) {
+      sectionsEl.innerHTML = '<div class="empty">表示できるIDがありません</div>';
+      summaryEl.textContent = '合計表示件数: 0';
+      return;
+    }
+
+    rows.forEach((rowIds, rowIndex) => {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'seat-row';
+      rowEl.style.gridTemplateColumns = 'repeat(' + Math.max(1, rowIds.length) + ', minmax(0, 1fr))';
+
+      rowIds.forEach((seatId) => {
+        const key = String(seatId);
+        const seat = bySeat[key] || { totalCount: 0, items: [] };
+        rowEl.appendChild(renderSeat(seatId, seat, { featuredMode: rowIndex === 0 }));
+      });
+
+      sectionsEl.appendChild(rowEl);
+    });
+
+    sectionsEl.style.gridTemplateRows = 'repeat(' + rows.length + ', minmax(0, 1fr))';
+    summaryEl.textContent = '合計表示件数: ' + (data.total || 0) + ' / 表示ID: ' + rowLayout.visibleIds.join(',');
+  }
+
+  async function loadGallery() {
+    const seatIds = getSelectedIds();
+    const maxPerSeat = Math.max(1, Math.min(500, parseInt(maxPerSeatEl.value || '120', 10) || 120));
+
+    if (seatIds.length === 0) {
+      sectionsEl.innerHTML = '<div class="empty">IDを1つ以上選択してください</div>';
+      summaryEl.textContent = '合計表示件数: 0';
+      statusEl.textContent = formatStatus('ID未選択');
+      return;
+    }
+
+    statusEl.textContent = formatStatus('読み込み中...');
+
+    try {
+      const params = new URLSearchParams();
+      params.set('ids', seatIds.join(','));
+      params.set('maxPerSeat', String(maxPerSeat));
+
+      const res = await fetch('/api/save-gallery?' + params.toString(), { cache: 'no-store' });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || '一覧取得に失敗しました');
+      }
+
+      renderGallery(data);
+      requestAnimationFrame(applySeatColumns);
+      statusEl.textContent = formatStatus('更新: ' + new Date().toLocaleString());
+    } catch (error) {
+      sectionsEl.innerHTML = '<div class="empty">一覧の取得に失敗しました</div>';
+      summaryEl.textContent = '合計表示件数: 0';
+      statusEl.textContent = formatStatus('取得失敗: ' + error.message);
+    }
+  }
+
+  function closeLiveUpdateSource() {
+    if (liveUpdateSource) {
+      try { liveUpdateSource.close(); } catch {}
+      liveUpdateSource = null;
+    }
+    if (liveUpdateReconnectTimer) {
+      clearTimeout(liveUpdateReconnectTimer);
+      liveUpdateReconnectTimer = null;
+    }
+  }
+
+  function requestLiveRefresh() {
+    if (liveUpdatePendingTimer) return;
+    liveUpdatePendingTimer = setTimeout(() => {
+      liveUpdatePendingTimer = null;
+      loadGallery();
+    }, 120);
+  }
+
+  function connectLiveUpdates() {
+    closeLiveUpdateSource();
+    if (!liveUpdateEl.checked) return;
+
+    try {
+      const source = new EventSource('/api/save-gallery/live');
+      liveUpdateSource = source;
+
+      source.addEventListener('save-gallery-updated', () => {
+        requestLiveRefresh();
+      });
+
+      source.addEventListener('save-gallery-ready', () => {
+        statusEl.textContent = formatStatus('即時監視: 接続中');
+      });
+
+      source.onerror = () => {
+        statusEl.textContent = formatStatus('即時監視: 再接続中...');
+        closeLiveUpdateSource();
+        if (liveUpdateEl.checked) {
+          liveUpdateReconnectTimer = setTimeout(connectLiveUpdates, 3000);
+        }
+      };
+    } catch (error) {
+      statusEl.textContent = formatStatus('即時監視接続失敗: ' + (error && error.message ? error.message : 'unknown'));
+    }
+  }
+
+  function syncAutoRefresh() {
+    if (autoRefreshTimer) {
+      clearInterval(autoRefreshTimer);
+      autoRefreshTimer = null;
+    }
+
+    const intervalSec = Math.max(2, Math.min(120, parseInt(autoRefreshIntervalEl.value || '15', 10) || 15));
+    autoRefreshIntervalEl.value = String(intervalSec);
+
+    try {
+      localStorage.setItem(AUTO_REFRESH_ENABLED_KEY, autoRefreshEl.checked ? '1' : '0');
+      localStorage.setItem(AUTO_REFRESH_INTERVAL_KEY, String(intervalSec));
+    } catch {}
+
+    if (autoRefreshEl.checked) {
+      autoRefreshTimer = window.setInterval(loadGallery, intervalSec * 1000);
+    }
+  }
+
+  function syncLiveUpdate() {
+    try {
+      localStorage.setItem(LIVE_UPDATE_ENABLED_KEY, liveUpdateEl.checked ? '1' : '0');
+    } catch {}
+
+    connectLiveUpdates();
+  }
+
+  setupIdGrid();
+  loadStoredState();
+  sectionsEl.classList.add('compact-wall-grid');
+  document.body.classList.add('controls-hidden');
+  const buildBadgeEl = document.getElementById('build-badge');
+  if (buildBadgeEl) buildBadgeEl.textContent = 'SV ' + SV_BUILD;
+  statusEl.textContent = formatStatus('準備完了');
+  applyThumbSize();
+  applyMetaVisibility();
+  persistLayoutInputs();
+  syncLiveUpdate();
+  syncAutoRefresh();
+
+  btnHideControls.addEventListener('click', () => {
+    document.body.classList.add('controls-hidden');
+  });
+
+  btnShowControls.addEventListener('click', () => {
+    document.body.classList.remove('controls-hidden');
+  });
+
+  document.getElementById('btn-refresh').addEventListener('click', loadGallery);
+  document.getElementById('btn-all').addEventListener('click', () => {
+    setCheckedIds([1,2,3,4,5,6,7,8,9,10]);
+    loadGallery();
+  });
+  document.getElementById('btn-none').addEventListener('click', () => {
+    setCheckedIds([]);
+    loadGallery();
+  });
+  document.getElementById('btn-recent').addEventListener('click', () => {
+    setCheckedIds(DEFAULT_IDS);
+    loadGallery();
+  });
+
+  idGridEl.addEventListener('change', loadGallery);
+  maxPerSeatEl.addEventListener('change', loadGallery);
+  thumbSizeEl.addEventListener('input', applyThumbSize);
+  liveUpdateEl.addEventListener('change', syncLiveUpdate);
+  autoRefreshEl.addEventListener('change', syncAutoRefresh);
+  autoRefreshIntervalEl.addEventListener('change', syncAutoRefresh);
+  toggleFileNameEl.addEventListener('change', applyMetaVisibility);
+  toggleUpdatedEl.addEventListener('change', applyMetaVisibility);
+  btnApplyLayoutEl.addEventListener('click', () => {
+    persistLayoutInputs();
+    loadGallery();
+  });
+  layoutTopEl.addEventListener('change', persistLayoutInputs);
+  layoutBottomEl.addEventListener('change', persistLayoutInputs);
+  window.addEventListener('resize', () => {
+    requestAnimationFrame(applySeatColumns);
+  });
+
+  loadGallery();
+</script>
+</body>
+</html>

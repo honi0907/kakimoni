@@ -1,11 +1,12 @@
 {
   "name": "kakimoni",
-  "version": "1.0.1",
+  "version": "1.3.9",
   "description": "クイズ番組用タブレット書きシステム",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "npx nodemon server.js"
+    "dev": "npx nodemon server.js",
+    "build:package": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-server-package.ps1"
   },
   "dependencies": {
     "express": "^4.18.2",

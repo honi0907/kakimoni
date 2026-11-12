@@ -140,6 +140,7 @@
   .seat-card {
     background: var(--surface); border: 2px solid var(--border);
     border-radius: 0; overflow: hidden; display: flex; flex-direction: column;
+    position: relative;
     transition: border-color 0.2s;
   }
   /* 接続状態は opacity 差分のみで区別 (枠色なし) */
@@ -180,6 +181,7 @@
   /* ロックオーバーレイ */
   .seat-canvas-wrap {
     position: relative; background: #fff; aspect-ratio: 16/9; overflow: hidden;
+    -webkit-user-select: none; user-select: none;
   }
   .seat-canvas { width: 100%; height: 100%; display: block; position: absolute; inset: 0; z-index: 9; }
   .seat-bg-layer {
@@ -214,6 +216,7 @@
   /* 通常（中央配置）画像 */
   .seat-result-overlay img {
     max-width: 80%; max-height: 80%; object-fit: contain;
+    -webkit-user-select: none; user-select: none;
   }
   /* 全面フィル画像 */
   .seat-result-overlay img.overlay-fill {
@@ -227,7 +230,7 @@
     display: none; pointer-events: none;
   }
   .seat-choice-layer.show { display: flex; align-items: center; justify-content: center; }
-  .seat-choice-layer img { width: 100%; height: 100%; object-fit: contain; }
+  .seat-choice-layer img { width: 100%; height: 100%; object-fit: contain; -webkit-user-select: none; user-select: none; }
 
   /* 未接続カードは全体を薄く */
   .seat-card:not(.connected) { filter: brightness(0.5); }
@@ -721,6 +724,98 @@
     box-shadow: 0 3px 0 rgba(0,0,0,0.4);
   }
   #label-cancel-btn:hover { opacity: 0.9; }
+
+  /* inline style removal helpers */
+  #host-url { font-size: 0.85rem; color: #6b7280; }
+  .btn-blue-action {
+    background: linear-gradient(180deg, #1e3a5f 0%, #0f2240 100%);
+    color: #93c5fd;
+    border: 1px solid #3b82f6;
+  }
+  .btn-full-width { width: 100%; }
+  .flex-col-gap-3 { display: flex; flex-direction: column; gap: 3px; }
+  .choice-group-inline { display: flex; align-items: center; gap: 12px; }
+  .judge-select {
+    background: #1e2a3a;
+    border-radius: 3px;
+    padding: 3px 6px;
+    font-size: 0.78rem;
+    height: 28px;
+    cursor: pointer;
+    max-width: 110px;
+  }
+  #judge-correct-sel { color: #f87171; border: 1px solid #dc2626; }
+  #judge-incorrect-sel { color: #93c5fd; border: 1px solid #3b82f6; }
+  #choice-select {
+    background: #1e2a3a;
+    color: #e2e8f0;
+    border: 1px solid #3b82f6;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    height: 32px;
+    cursor: pointer;
+  }
+  #choice-thumb {
+    display: none;
+    width: 56px;
+    height: 32px;
+    object-fit: cover;
+    border: 1px solid #3b82f6;
+    border-radius: 4px;
+    background: #0f172a;
+  }
+  .settings-row-mt {
+    margin-top: 12px;
+    align-items: center;
+    gap: 12px;
+  }
+  .settings-row-wrap { flex-wrap: wrap; }
+  .label-small-nowrap { font-size: 0.85rem; white-space: nowrap; }
+  #lock-darkness-slider { flex: 1; min-width: 120px; accent-color: #7c3aed; }
+  #lock-darkness-value { font-size: 0.85rem; color: #fbbf24; min-width: 36px; text-align: right; }
+  .settings-desc-full { width: 100%; margin-top: 2px; }
+  #ctrl-bg-color {
+    width: 44px;
+    height: 32px;
+    border: 1px solid #374151;
+    border-radius: 4px;
+    background: none;
+    cursor: pointer;
+    padding: 2px;
+  }
+  #ctrl-bg-reset {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+    background: #1e293b;
+    border: 1px solid #374151;
+    color: #94a3b8;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .text-muted-note { font-size: 0.72rem; color: #6b7280; margin-top: 6px; }
+  .flex-gap-4 { display: flex; gap: 4px; }
+  #lbl-bgopacity { flex: 1; }
+  .text-small-muted { font-size: 0.75rem; color: #94a3b8; }
+  .roster-desc { font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px; }
+  #roster-hint { font-size: 0.75rem; color: #6b7280; margin-top: 8px; }
+  .fci-text-title { color: #fbbf24; font-weight: bold; margin-bottom: 4px; }
+  .fci-wrap-row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-top: 4px; }
+  #fci-text-bg-opacity { width: 44px; }
+  .fci-align-row { display: flex; gap: 4px; align-items: center; margin-top: 4px; }
+  .ml-6 { margin-left: 6px; }
+  .layout-target-wrap { display: flex; align-items: center; gap: 6px; flex: 1; }
+  .layout-target-label { font-size: 0.75rem; color: #94a3b8; white-space: nowrap; }
+  #layout-target-group {
+    flex: 1;
+    background: #1e293b;
+    border: 1px solid #374151;
+    color: #e2e8f0;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    outline: none;
+  }
 </style>
 </head>
 <body>
@@ -739,7 +834,7 @@
     <div id="host-multi-status">操作端末: -</div>
     <div id="host-last-action">最終操作: -</div>
   </div>
-  <div style="font-size:0.85rem; color:#6b7280;" id="host-url"></div>
+  <div id="host-url"></div>
 </div>
 <div id="save-toast"></div>
 
@@ -750,27 +845,28 @@
     <div id="go-group">
       <span id="selected-badge"></span>
       <button class="g-btn btn-open" id="g-go">GO</button>
-      <button class="g-btn" id="g-select-all" style="background:linear-gradient(180deg,#1e3a5f 0%,#0f2240 100%);color:#93c5fd;border:1px solid #3b82f6">全選択</button>
-      <button class="g-btn" id="g-deselect-all" style="background:linear-gradient(180deg,#1e3a5f 0%,#0f2240 100%);color:#93c5fd;border:1px solid #3b82f6">全解除</button>
+      <button class="g-btn btn-blue-action" id="g-select-all">全選択</button>
+      <button class="g-btn btn-blue-action" id="g-deselect-all">全解除</button>
       <button class="g-btn btn-correct" id="g-judge">判定GO</button>
       <div class="ctrl-right-sep"></div>
-      <div style="display:flex;flex-direction:column;gap:3px">
-        <select id="judge-correct-sel" title="正解画像" style="background:#1e2a3a;color:#f87171;border:1px solid #dc2626;border-radius:3px;padding:3px 6px;font-size:0.78rem;height:28px;cursor:pointer;max-width:110px;"><option value="">移動なし</option></select>
-        <select id="judge-incorrect-sel" title="不正解画像" style="background:#1e2a3a;color:#93c5fd;border:1px solid #3b82f6;border-radius:3px;padding:3px 6px;font-size:0.78rem;height:28px;cursor:pointer;max-width:110px;"><option value="">移動なし</option></select>
+      <div class="flex-col-gap-3">
+        <select id="judge-correct-sel" class="judge-select" title="正解画像"><option value="">移動なし</option></select>
+        <select id="judge-incorrect-sel" class="judge-select" title="不正解画像"><option value="">移動なし</option></select>
       </div>
     </div>
-    <button class="g-btn" id="g-judge-clear" style="background:linear-gradient(180deg,#1e3a5f 0%,#0f2240 100%);color:#93c5fd;border:1px solid #3b82f6">判定解除</button>
+    <button class="g-btn btn-blue-action" id="g-judge-clear">判定解除</button>
     <div class="ctrl-right-sep"></div>
-    <div id="choice-group" style="display:flex;align-items:center;gap:12px">
-      <select id="choice-select" title="選択肢画像" style="background:#1e2a3a;color:#e2e8f0;border:1px solid #3b82f6;border-radius:6px;padding:4px 8px;font-size:0.8rem;height:32px;cursor:pointer">
+    <div id="choice-group" class="choice-group-inline">
+      <select id="choice-select" title="選択肢画像">
         <option value="">&#x2015;なし&#x2015;</option>
       </select>
-      <button class="g-btn" id="btn-choice-send" style="background:linear-gradient(180deg,#1e3a5f 0%,#0f2240 100%);color:#93c5fd;border:1px solid #3b82f6">選択肢送信</button>
+      <img id="choice-thumb" alt="選択肢サムネイル" />
+      <button class="g-btn btn-blue-action" id="btn-choice-send">選択肢送信</button>
     </div>
   </div>
   <!-- 右寄せ -->
   <div class="ctrl-right">
-    <button class="g-btn" id="btn-settings-open" style="background:linear-gradient(180deg,#1e3a5f 0%,#0f2240 100%);color:#93c5fd;border:1px solid #3b82f6">⚙️ 設定</button>
+    <button class="g-btn btn-blue-action" id="btn-settings-open">⚙️ 設定</button>
     <div class="ctrl-right-sep"></div>
     <button class="g-btn btn-clear" id="g-clear-all">全クリア</button>
     <button class="g-btn btn-unlock" id="g-lock-toggle">全ロック</button>
@@ -805,17 +901,16 @@
           <div class="settings-desc">判定GOでfill型判定画像が表示された際、パレットの色を反転（色の補色）して再描画します。子機・親機・レイアウト全画面に適用。</div>
         </div>
       </div>
-      <div class="settings-row" style="margin-top:12px;align-items:center;gap:12px;flex-wrap:wrap">
-        <label style="font-size:0.85rem;white-space:nowrap">🔒 ロック暗転濃度</label>
-        <input type="range" id="lock-darkness-slider" min="0" max="100" value="65" step="1"
-          style="flex:1;min-width:120px;accent-color:#7c3aed">
-        <span id="lock-darkness-value" style="font-size:0.85rem;color:#fbbf24;min-width:36px;text-align:right">65%</span>
-        <div class="settings-desc" style="width:100%;margin-top:2px">子機で「決定」を押すか、親機からロックした時の画面の暗転濃度です。全子機・モバイルに適用。</div>
+      <div class="settings-row settings-row-mt settings-row-wrap">
+        <label class="label-small-nowrap">🔒 ロック暗転濃度</label>
+        <input type="range" id="lock-darkness-slider" min="0" max="100" value="65" step="1">
+        <span id="lock-darkness-value">65%</span>
+        <div class="settings-desc settings-desc-full">子機で「決定」を押すか、親機からロックした時の画面の暗転濃度です。全子機・モバイルに適用。</div>
       </div>
-      <div class="settings-row" style="margin-top:12px;align-items:center;gap:12px">
-        <label for="ctrl-bg-color" style="font-size:0.85rem;white-space:nowrap">🎨 ページ背景色</label>
-        <input type="color" id="ctrl-bg-color" value="#1a1a1a" style="width:44px;height:32px;border:1px solid #374151;border-radius:4px;background:none;cursor:pointer;padding:2px">
-        <button id="ctrl-bg-reset" style="font-size:0.75rem;padding:4px 10px;background:#1e293b;border:1px solid #374151;color:#94a3b8;border-radius:3px;cursor:pointer">リセット</button>
+      <div class="settings-row settings-row-mt">
+        <label for="ctrl-bg-color" class="label-small-nowrap">🎨 ページ背景色</label>
+        <input type="color" id="ctrl-bg-color" value="#1a1a1a">
+        <button id="ctrl-bg-reset">リセット</button>
       </div>
     </div>
     <!-- ラベルタブ -->
@@ -825,7 +920,7 @@
           <input type="checkbox" id="lbl-enabled" checked>
           <label for="lbl-enabled">ラベルを表示する</label>
         </div>
-        <div style="font-size:0.72rem;color:#6b7280;margin-top:6px">表示テキストは「名簿」タブで読み込んだIDごとの名前です</div>
+        <div class="text-muted-note">表示テキストは「名簿」タブで読み込んだIDごとの名前です</div>
       </div>
       <div class="label-section">
         <div class="label-section-title">🔤 フォント</div>
@@ -837,17 +932,17 @@
         <div class="label-section-title">📍 位置・揃え</div>
         <div class="label-row"><label>X</label><input type="range" id="lbl-x" min="0" max="100" value="50"><span class="lbl-val" id="lbl-x-val">50%</span></div>
         <div class="label-row"><label>Y</label><input type="range" id="lbl-y" min="0" max="100" value="86"><span class="lbl-val" id="lbl-y-val">86%</span></div>
-        <div class="label-row"><label>揃え</label><div style="display:flex;gap:4px"><button class="lbl-align-btn" data-align="left">左</button><button class="lbl-align-btn active" data-align="center">中央</button><button class="lbl-align-btn" data-align="right">右</button></div></div>
+        <div class="label-row"><label>揃え</label><div class="flex-gap-4"><button class="lbl-align-btn" data-align="left">左</button><button class="lbl-align-btn active" data-align="center">中央</button><button class="lbl-align-btn" data-align="right">右</button></div></div>
       </div>
       <div class="label-section">
         <div class="label-section-title">🎨 色</div>
         <div class="label-row"><label>文字色</label><input type="color" id="lbl-color" value="#000000"></div>
-        <div class="label-row"><label>背景色</label><input type="color" id="lbl-bgcolor" value="#000000"><input type="range" id="lbl-bgopacity" min="0" max="100" value="0" style="flex:1"><span class="lbl-val" id="lbl-bgopacity-val">0%</span></div>
+        <div class="label-row"><label>背景色</label><input type="color" id="lbl-bgcolor" value="#000000"><input type="range" id="lbl-bgopacity" min="0" max="100" value="0"><span class="lbl-val" id="lbl-bgopacity-val">0%</span></div>
         <div class="label-row"><label>背景余白</label><input type="range" id="lbl-bgpadding" min="0" max="40" value="8"><span class="lbl-val" id="lbl-bgpadding-val">8px</span></div>
       </div>
       <div class="label-section">
         <div class="label-section-title">✨ 影</div>
-        <div class="label-row"><label>影</label><input type="checkbox" id="lbl-shadow"><span style="font-size:0.75rem;color:#94a3b8">影を表示する</span></div>
+        <div class="label-row"><label>影</label><input type="checkbox" id="lbl-shadow"><span class="text-small-muted">影を表示する</span></div>
         <div id="lbl-shadow-opts">
           <div class="label-row"><label>影の色</label><input type="color" id="lbl-shadowcolor" value="#000000"></div>
           <div class="label-row"><label>ぼかし</label><input type="range" id="lbl-shadowblur" min="0" max="30" value="4"><span class="lbl-val" id="lbl-shadowblur-val">4px</span></div>
@@ -860,9 +955,9 @@
     <!-- 名簿タブ -->
     <div id="tab-roster" class="settings-tab-pane">
       <div id="roster-tab-area">
-        <div style="font-size:0.8rem;color:#94a3b8;margin-bottom:10px">席番号順（1行1名）のテキストファイルを読み込んで全席に配信します。</div>
-        <button id="btn-roster-load" class="g-btn" style="background:linear-gradient(180deg,#1e3a5f 0%,#0f2240 100%);color:#93c5fd;border:1px solid #3b82f6;width:100%">📂 名簿ファイルを選択して読み込む</button>
-        <div id="roster-hint" style="font-size:0.75rem;color:#6b7280;margin-top:8px">席番号順（1行1名）のテキストファイルを読み込んで全席に配信</div>
+        <div class="roster-desc">席番号順（1行1名）のテキストファイルを読み込んで全席に配信します。</div>
+        <button id="btn-roster-load" class="g-btn btn-blue-action btn-full-width">📂 名簿ファイルを選択して読み込む</button>
+        <div id="roster-hint">席番号順（1行1名）のテキストファイルを読み込んで全席に配信</div>
       </div>
     </div>
     <!-- レイアウトタブ -->
@@ -907,8 +1002,8 @@
           </div>
         </div>
         <div id="fci-text-section" class="no-selection">
-          <div style="color:#fbbf24;font-weight:bold;margin-bottom:4px;">📝 テキストオーバーレイ</div>
-          <div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:4px;">
+          <div class="fci-text-title">📝 テキストオーバーレイ</div>
+          <div class="fci-wrap-row">
             <div class="fci-group">
               <span class="fci-label">文字色</span>
               <input type="color" id="fci-text-color" class="fci-color-inp" value="#ffffff">
@@ -916,7 +1011,7 @@
             <div class="fci-group">
               <span class="fci-label">背景色</span>
               <input type="color" id="fci-text-bg" class="fci-color-inp" value="#000000">
-              <input type="range" id="fci-text-bg-opacity" min="0" max="100" value="50" style="width:44px;">
+              <input type="range" id="fci-text-bg-opacity" min="0" max="100" value="50">
               <span id="fci-text-bg-opacity-val" class="fci-label">50%</span>
             </div>
             <div class="fci-group">
@@ -924,12 +1019,12 @@
               <input type="number" id="fci-text-size" class="fci-inp" value="48" min="8" max="400">
             </div>
           </div>
-          <div style="display:flex;gap:4px;align-items:center;margin-top:4px;">
+          <div class="fci-align-row">
             <span class="fci-label">縦</span>
             <button class="fci-valign-btn active" data-valign="top">上</button>
             <button class="fci-valign-btn" data-valign="center">中</button>
             <button class="fci-valign-btn" data-valign="bottom">下</button>
-            <span class="fci-label" style="margin-left:6px;">横</span>
+            <span class="fci-label ml-6">横</span>
             <button class="fci-halign-btn active" data-halign="left">左</button>
             <button class="fci-halign-btn" data-halign="center">中</button>
             <button class="fci-halign-btn" data-halign="right">右</button>
@@ -945,12 +1040,10 @@
         </div>
       </div>
       <div id="layout-modal-actions">
-        <div style="display:flex;align-items:center;gap:6px;flex:1">
-          <label style="font-size:0.75rem;color:#94a3b8;white-space:nowrap">📺 送信先グループ</label>
+        <div class="layout-target-wrap">
+          <label class="layout-target-label">📺 送信先グループ</label>
           <input type="text" id="layout-target-group" value="default"
-            placeholder="default"
-            style="flex:1;background:#1e293b;border:1px solid #374151;color:#e2e8f0;
-                   padding:4px 8px;border-radius:3px;font-size:0.8rem;outline:none">
+            placeholder="default">
         </div>
         <button id="layout-reset-btn">クリア</button>
         <button id="layout-apply-btn">📺 送信</button>
@@ -1104,6 +1197,9 @@ function connect() {
       if (chk) chk.checked = judgeColorMode;
       updateJudgeInvertBadge(judgeColorMode);
     }
+    if (typeof state.judgeFillLayerMode !== 'undefined') {
+      applyJudgeFillLayerMode(state.judgeFillLayerMode, { persist: true });
+    }
     // ロック暗転濃度を復元
     if (typeof state.lockDarkness !== 'undefined') {
       applyLockDarknessUI(state.lockDarkness);
@@ -1171,6 +1267,7 @@ function connect() {
     if (!ovl || !rimg) return;
     ovl.classList.remove('show');
     rimg.src = '';
+    rimg.className = '';
     const seat = seats.get(String(seatId));
     if (seat) { seat.judging = false; seat.fillImageUrl = ''; updateBgLayer(String(seatId)); redrawCanvas(seat); }
   }
@@ -1181,9 +1278,10 @@ function connect() {
     const isFill = /fill/i.test(imageUrl.split('/').pop());
     const seat = seats.get(String(seatId));
     if (isFill) {
-      ovl.classList.remove('show');
-      rimg.src = '';
-      if (seat) { seat.judging = true; seat.fillImageUrl = imageUrl; updateBgLayer(String(seatId)); redrawCanvas(seat); }
+      rimg.src = imageUrl;
+      rimg.className = 'overlay-fill';
+      ovl.classList.add('show');
+      if (seat) { seat.judging = true; seat.fillImageUrl = ''; updateBgLayer(String(seatId)); redrawCanvas(seat); }
     } else {
       if (seat) { seat.judging = false; seat.fillImageUrl = ''; updateBgLayer(String(seatId)); redrawCanvas(seat); }
       rimg.src = imageUrl;
@@ -1225,6 +1323,9 @@ function connect() {
     if (chk) chk.checked = enabled;
     updateJudgeInvertBadge(enabled);
     for (const seat of seats.values()) redrawCanvas(seat);
+  });
+  socket.on('judge-fill-layer-mode', ({ mode }) => {
+    applyJudgeFillLayerMode(mode, { persist: true });
   });
 
 }
@@ -1277,12 +1378,12 @@ function createSeatCard(id, seatData) {
         <div class="seat-hbtn s-select-zone" id="selbtn-${id}" onclick="toggleSelect('${id}')">選択</div>
       </div>
     </div>
+    <div class="seat-result-overlay" id="rovl-${id}"><img id="rimg-${id}" src="" alt="" draggable="false"></div>
     <div class="seat-canvas-wrap" id="cwrap-${id}">
-      <div class="seat-choice-layer" id="clayer-${id}"><img id="cimg-${id}" src="" alt=""></div>
+      <div class="seat-choice-layer" id="clayer-${id}"><img id="cimg-${id}" src="" alt="" draggable="false"></div>
       <canvas class="seat-canvas" id="canvas-${id}"></canvas>
       <div class="seat-name-label" id="hlabel-${id}"></div>
       <div class="seat-placeholder" id="placeholder-${id}">待機中</div>
-      <div class="seat-result-overlay" id="rovl-${id}"><img id="rimg-${id}" src="" alt=""></div>
       <div class="seat-bg-layer" id="bglayer-${id}"></div>
     </div>
     <div class="seat-ctrl">
@@ -1302,24 +1403,39 @@ function createSeatCard(id, seatData) {
     const wrap = document.getElementById(`cwrap-${id}`);
     const r = window.devicePixelRatio || 1;
     const w = wrap.clientWidth;
+
+    // まず白背景を敷く
     const h = wrap.clientHeight;
     canvas.width  = Math.floor(w * r);
-    canvas.height = Math.floor(h * r);
-    canvas.style.width  = w + 'px';
-    canvas.style.height = h + 'px';
-    ctx.scale(r, r);
-    const seat = seats.get(id);
-    if (seat) redrawCanvas(seat);
-  }
+    seat.ctx.fillStyle = '#ffffff';
+    seat.ctx.fillRect(0, 0, w, h);
   // ダブルクリック / ダブルタップでクリア
+
+    // fill を BG の下に出すモードでは BG より先に描画
+    if (judgeFillLayerMode === 'under' && seat.fillImage) {
+      seat.ctx.drawImage(seat.fillImage, 0, 0, w, h);
+    }
+
   const cwrap = document.getElementById(`cwrap-${id}`);
-  cwrap.addEventListener('dblclick', () => clearSeat(id));
-  let lastTap = 0;
-  cwrap.addEventListener('touchend', (e) => {
-    const now = Date.now();
-    if (now - lastTap < 300) { e.preventDefault(); clearSeat(id); }
-    lastTap = now;
-  }, { passive: false });
+  const headerInfo = card.querySelector('.seat-header-info');
+  function bindDoubleClear(target) {
+    if (!target) return;
+    target.addEventListener('dblclick', (e) => { e.preventDefault(); clearSeat(id); });
+    let lastTap = 0;
+    target.addEventListener('touchend', (e) => {
+      const now = Date.now();
+      if (now - lastTap < 300) { e.preventDefault(); clearSeat(id); }
+      lastTap = now;
+    }, { passive: false });
+  }
+  bindDoubleClear(cwrap);
+  bindDoubleClear(headerInfo);
+
+    // fill を BG の上に出すモードでは BG の後に描画
+    if (judgeFillLayerMode === 'over' && seat.fillImage) {
+      seat.ctx.drawImage(seat.fillImage, 0, 0, w, h);
+    }
+
 
   setTimeout(resizeCanvas, 50);
   window.addEventListener('resize', resizeCanvas);
@@ -1587,18 +1703,51 @@ function deselectAll() {
 // 選択肢画像
 // ====================================================
 let currentChoiceImageUrl = '';
+function choiceBasePath(url) {
+  return String(url || '').trim().split('?')[0].split('#')[0];
+}
+
+function decodeChoiceLabel(url) {
+  const raw = choiceBasePath(url).split('/').pop() || '';
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+function updateChoiceThumb(url) {
+  const thumb = document.getElementById('choice-thumb');
+  if (!thumb) return;
+  const src = forceReloadImageUrl(url);
+  if (!src) {
+    thumb.src = '';
+    thumb.style.display = 'none';
+    return;
+  }
+  thumb.src = src;
+  thumb.style.display = 'block';
+}
+
+function forceReloadImageUrl(url) {
+  const baseUrl = choiceBasePath(url);
+  if (!baseUrl) return '';
+  return `${baseUrl}?v=${Date.now()}`;
+}
 function applyChoiceImage(url) {
-  currentChoiceImageUrl = url || '';
+  currentChoiceImageUrl = forceReloadImageUrl(url);
+  updateChoiceThumb(url);
   for (const [id] of seats) {
     const layer = document.getElementById(`clayer-${id}`);
     const img   = document.getElementById(`cimg-${id}`);
     if (!layer || !img) continue;
-    img.src = url;
+    img.src = currentChoiceImageUrl;
     layer.classList.add('show');
   }
 }
 function clearChoiceImage() {
   currentChoiceImageUrl = '';
+  updateChoiceThumb('');
   for (const [id] of seats) {
     const layer = document.getElementById(`clayer-${id}`);
     const img   = document.getElementById(`cimg-${id}`);
@@ -1613,10 +1762,14 @@ fetch('/api/choice-images').then(r => r.json()).then(list => {
   for (const url of list) {
     const opt = document.createElement('option');
     opt.value = url;
-    opt.textContent = url.split('/').pop();
+    opt.textContent = decodeChoiceLabel(url);
     sel.appendChild(opt);
   }
 }).catch(() => {});
+
+document.getElementById('choice-select').addEventListener('change', (e) => {
+  updateChoiceThumb(e.target.value);
+});
 
 document.getElementById('btn-choice-send').addEventListener('click', () => {
   const url = document.getElementById('choice-select').value;
@@ -1706,11 +1859,18 @@ async function captureAndSave(seatId, type, session, counter, judgeImageUrl = nu
   octx.fillStyle = '#ffffff';
   octx.fillRect(0, 0, W, H);
 
-  // fill型の判定 → 白背景の直上・BG画像の下
-  if (type === 'JUDGE' && isFillJudge) await loadImageToCanvas(octx, judgeImageUrl, 0, 0, W, H);
+  // fill を BG の下に出すモード
+  if (type === 'JUDGE' && isFillJudge && judgeFillLayerMode === 'under') {
+    await loadImageToCanvas(octx, judgeImageUrl, 0, 0, W, H);
+  }
 
   // BG画像
   if (seat.bgImageUrl) await loadImageToCanvas(octx, seat.bgImageUrl, 0, 0, W, H);
+
+  // fill を BG の上に出すモード
+  if (type === 'JUDGE' && isFillJudge && judgeFillLayerMode === 'over') {
+    await loadImageToCanvas(octx, judgeImageUrl, 0, 0, W, H);
+  }
 
   // 描画ストロークをフル解像度で直接再描画（seat.canvasの低解像度upscaleを避ける）
   const saveInv = type !== 'GO' && judgeColorMode && seat.judging;
@@ -2691,6 +2851,10 @@ function buildFreeSaveSlots() {
       s[i] = { name: slotName, mode: 'free', freeCells: freeCells.map(c => ({ ...c })), bgUrl: freeBgUrl || null };
       saveFreeSlotsToStorage(s);
       buildFreeSaveSlots();
+      if (selectedCellId !== null) {
+        const cell = freeCells.find(c => c.id === selectedCellId);
+        if (cell) updateInspector(cell);
+      }
     };
     saveBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -2838,6 +3002,31 @@ document.getElementById('layout-apply-btn').addEventListener('click', () => {
 
 // ── システム設定モーダル（タブ付き） ──────────────────────
 let judgeColorMode = localStorage.getItem('judgeColorMode') === '1';
+const JUDGE_FILL_LAYER_KEY = 'judgeFillLayerMode';
+
+function normalizeJudgeFillLayerMode(value) {
+  return value === 'under' ? 'under' : 'over';
+}
+
+function resolveJudgeFillLayerMode() {
+  const params = new URLSearchParams(location.search);
+  const qp = (params.get('judgeFillLayer') || '').trim().toLowerCase();
+  if (qp === 'under' || qp === 'over') {
+    localStorage.setItem(JUDGE_FILL_LAYER_KEY, qp);
+    return qp;
+  }
+  return normalizeJudgeFillLayerMode(localStorage.getItem(JUDGE_FILL_LAYER_KEY));
+}
+
+let judgeFillLayerMode = resolveJudgeFillLayerMode();
+
+function applyJudgeFillLayerMode(mode, options = {}) {
+  const { persist = true } = options;
+  judgeFillLayerMode = normalizeJudgeFillLayerMode(mode);
+  if (persist) localStorage.setItem(JUDGE_FILL_LAYER_KEY, judgeFillLayerMode);
+  for (const seat of seats.values()) redrawCanvas(seat);
+}
+
 (function() {
   const chk = document.getElementById('chk-judge-color-mode');
   if (chk) chk.checked = judgeColorMode;

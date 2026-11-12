@@ -13,6 +13,76 @@ const io = new Server(httpServer, {
   cors: { origin: '*', methods: ['GET', 'POST'] },
 });
 
+const defaultSaveViewerPath = path.join(__dirname, 'public', 'save-viewer', 'index.html');
+const legacyRuntimeSaveViewerPath = path.join(__dirname, 'saves', 'ui', 'save-viewer', 'index.html');
+
+function uniquePaths(paths) {
+  const out = [];
+  const seen = new Set();
+  for (const p of paths) {
+    const key = String(p || '').trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(key);
+  }
+  return out;
+}
+
+function getExternalSavedataRoots() {
+  const envRoot = String(process.env.KAKIMONI_SAVEDATA_DIR || '').trim();
+  const roots = uniquePaths([
+    path.resolve(__dirname, 'savedata'),
+    envRoot,
+    path.resolve(__dirname, '..', 'savedata'),
+    path.resolve(process.cwd(), 'savedata'),
+  ]);
+
+  return roots.map((root) => path.resolve(root));
+}
+
+function getExternalSaveViewerCandidates() {
+  return getExternalSavedataRoots().map((root) =>
+    path.join(root, 'web', 'save-viewer', 'index.html')
+  );
+}
+
+function ensureExternalSaveViewerHtml() {
+  if (!fs.existsSync(defaultSaveViewerPath)) return;
+
+  const candidates = getExternalSaveViewerCandidates();
+  if (candidates.length === 0) return;
+
+  const primary = candidates[0];
+  fs.mkdirSync(path.dirname(primary), { recursive: true });
+
+  // Keep external save-viewer in sync with bundled default to avoid stale UI.
+  if (!fs.existsSync(primary)) {
+    fs.copyFileSync(defaultSaveViewerPath, primary);
+    return;
+  }
+
+  try {
+    const bundled = fs.readFileSync(defaultSaveViewerPath, 'utf-8');
+    const external = fs.readFileSync(primary, 'utf-8');
+    if (bundled !== external) {
+      fs.copyFileSync(defaultSaveViewerPath, primary);
+    }
+  } catch {
+    fs.copyFileSync(defaultSaveViewerPath, primary);
+  }
+}
+
+function resolveActiveSaveViewerHtmlPath() {
+  const externalCandidates = getExternalSaveViewerCandidates();
+  for (const candidate of externalCandidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+
+  if (fs.existsSync(legacyRuntimeSaveViewerPath)) return legacyRuntimeSaveViewerPath;
+  if (fs.existsSync(defaultSaveViewerPath)) return defaultSaveViewerPath;
+  return null;
+}
+
 // ============================================================
 // サーバー状態管理
 // ============================================================
@@ -52,6 +122,7 @@ const state = {
   timerInterval: null,
   currentChoiceUrl: null,
   judgeColorMode: false,
+  judgeFillLayerMode: 'over',
   lockDarkness: 65,
   // 同時運用中のホストUI情報
   hostPanels: new Map(), // socketId -> { operatorName, uiType, connectedAt }
@@ -68,6 +139,10 @@ function sanitizeUiType(raw) {
   const v = String(raw || '').trim().toLowerCase();
   if (v === 'electron' || v === 'web') return v;
   return 'unknown';
+}
+
+function normalizeJudgeFillLayerMode(raw) {
+  return String(raw || '').trim().toLowerCase() === 'under' ? 'under' : 'over';
 }
 
 function broadcastHostPanels() {
@@ -105,6 +180,23 @@ app.get(['/host', '/host/', '/hostweb', '/hostweb/', '/host/index.html'], (req, 
   res.redirect(302, '/host-v2');
 });
 
+app.get(['/save-viewer', '/save-viewer/', '/save-viewer/index.html'], (req, res) => {
+  try {
+    ensureExternalSaveViewerHtml();
+    const filePath = resolveActiveSaveViewerHtmlPath();
+    if (!filePath) {
+      return res.status(404).send('save-viewer index.html が見つかりません。');
+    }
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+    return res.sendFile(filePath);
+  } catch (e) {
+    return res.status(500).send(`save-viewer の読み込みに失敗しました: ${e.message}`);
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ルートアクセス時はトップページへ
@@ -137,6 +229,7 @@ app.get('/', (req, res) => {
       <a href="/client">✏️ 子機（回答書き）</a>
       <a href="/client-mobile">📱 子機（スマホ簡易版）</a>
       <a href="/client-display">🪟 子機のセカンド（大型モニター）</a>
+      <a href="/save-viewer">🗂️ セーブ一覧ビューア</a>
     </div>
     <p class="ip">サーバーIPアドレス: <strong>${getLocalIP()}</strong>:${PORT}</p>
     </body></html>
@@ -147,11 +240,39 @@ app.get('/host-v2', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'host', 'index-v2.html'));
 });
 
+app.get('/api/save-viewer-source', (req, res) => {
+  const activePath = resolveActiveSaveViewerHtmlPath();
+  const externalCandidates = getExternalSaveViewerCandidates();
+  res.json({
+    activePath: activePath || '',
+    sourceType: activePath
+      ? (externalCandidates.includes(activePath)
+        ? 'external-savedata'
+        : (activePath === legacyRuntimeSaveViewerPath ? 'legacy-runtime' : 'default-public'))
+      : 'missing',
+    externalCandidates,
+    externalExisting: externalCandidates.filter((p) => fs.existsSync(p)),
+    legacyRuntimePath: legacyRuntimeSaveViewerPath,
+    legacyRuntimeExists: fs.existsSync(legacyRuntimeSaveViewerPath),
+    defaultPath: defaultSaveViewerPath,
+    defaultExists: fs.existsSync(defaultSaveViewerPath),
+  });
+});
+
+app.get('/api/ip', (req, res) => {
+  res.json({ ip: getLocalIP() });
+});
+
 // ============================================================
 // セーブ機能
 // ============================================================
 const savesDir = path.join(__dirname, 'saves');
 if (!fs.existsSync(savesDir)) fs.mkdirSync(savesDir);
+ensureExternalSaveViewerHtml();
+const saveGalleryLiveClients = new Set();
+const saveGalleryWatchers = [];
+let saveGalleryRevision = Date.now();
+let saveGalleryNotifyTimer = null;
 // 席ごとのサブフォルダを事前作成（ID01〜ID10）
 for (let i = 1; i <= 10; i++) {
   const subDir = path.join(savesDir, `ID${String(i).padStart(2, '0')}`);
@@ -172,10 +293,204 @@ function persistSaveState() {
 const clientSettingsDir = path.join(savesDir, 'client_settings');
 if (!fs.existsSync(clientSettingsDir)) fs.mkdirSync(clientSettingsDir, { recursive: true });
 
+const hostSettingsPath = path.join(savesDir, '.host-settings.json');
+const hostSettingLabelKeys = ['enabled','fontSize','fontFamily','x','y','textAlign','color',
+  'bgColor','bgPadding','shadowEnabled','shadowColor','shadowBlur',
+  'shadowOffsetX','shadowOffsetY','bold','italic'];
+
+function loadHostSettings() {
+  try {
+    if (!fs.existsSync(hostSettingsPath)) return;
+    const raw = JSON.parse(fs.readFileSync(hostSettingsPath, 'utf-8'));
+    if (!raw || typeof raw !== 'object') return;
+
+    if (typeof raw.judgeColorMode !== 'undefined') {
+      state.judgeColorMode = !!raw.judgeColorMode;
+    }
+
+    if (typeof raw.judgeFillLayerMode !== 'undefined') {
+      state.judgeFillLayerMode = normalizeJudgeFillLayerMode(raw.judgeFillLayerMode);
+    }
+
+    if (typeof raw.lockDarkness !== 'undefined') {
+      const v = Number(raw.lockDarkness);
+      if (!Number.isNaN(v)) state.lockDarkness = Math.max(0, Math.min(100, v));
+    }
+
+    if (raw.labelConfig && typeof raw.labelConfig === 'object') {
+      for (const key of hostSettingLabelKeys) {
+        if (typeof raw.labelConfig[key] !== 'undefined') {
+          state.labelConfig[key] = raw.labelConfig[key];
+        }
+      }
+    }
+
+    if (raw.displayLayouts && typeof raw.displayLayouts === 'object') {
+      state.displayLayouts = raw.displayLayouts;
+    }
+  } catch (e) {
+    console.error('[HostSettings] load error', e);
+  }
+}
+
+function persistHostSettings() {
+  try {
+    const payload = {
+      judgeColorMode: !!state.judgeColorMode,
+      judgeFillLayerMode: normalizeJudgeFillLayerMode(state.judgeFillLayerMode),
+      lockDarkness: Math.max(0, Math.min(100, Number(state.lockDarkness) || 65)),
+      labelConfig: state.labelConfig,
+      displayLayouts: state.displayLayouts,
+      updatedAt: new Date().toISOString(),
+    };
+    fs.writeFileSync(hostSettingsPath, JSON.stringify(payload, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('[HostSettings] save error', e);
+  }
+}
+
+loadHostSettings();
+setupSaveGalleryWatchers();
+
 function normalizeSeatId(raw) {
   const n = parseInt(String(raw || ''), 10);
   if (!Number.isInteger(n) || n < 1 || n > 99) return null;
   return n;
+}
+
+function normalizeSeatIdForSave(raw) {
+  const n = parseInt(String(raw || ''), 10);
+  if (!Number.isInteger(n) || n < 1 || n > 10) return null;
+  return n;
+}
+
+function parseSeatIdsQuery(raw) {
+  const source = String(raw || '').trim();
+  if (!source) return Array.from({ length: 10 }, (_, i) => i + 1);
+
+  const unique = new Set();
+  for (const token of source.split(',')) {
+    const n = normalizeSeatIdForSave(token);
+    if (n) unique.add(n);
+  }
+
+  return unique.size > 0 ? Array.from(unique).sort((a, b) => a - b) : Array.from({ length: 10 }, (_, i) => i + 1);
+}
+
+function readSeatSaveEntries(seatId) {
+  const seatLabel = String(seatId).padStart(2, '0');
+  const seatDir = path.join(savesDir, `ID${seatLabel}`);
+  if (!fs.existsSync(seatDir)) return [];
+
+  const files = fs.readdirSync(seatDir).filter((f) => /\.png$/i.test(f));
+  const entries = [];
+
+  for (const fileName of files) {
+    const parsed = fileName.match(/^ID(\d{2})_(\d{2})_(\d{3})_([^.]+)\.png$/i);
+    if (!parsed) continue;
+    if (parseInt(parsed[1], 10) !== seatId) continue;
+
+    const filePath = path.join(seatDir, fileName);
+    let stat = null;
+    try {
+      stat = fs.statSync(filePath);
+    } catch {
+      continue;
+    }
+
+    entries.push({
+      seatId,
+      session: parseInt(parsed[2], 10),
+      counter: parseInt(parsed[3], 10),
+      type: String(parsed[4] || '').toUpperCase(),
+      fileName,
+      size: stat.size,
+      updatedAt: stat.mtime.toISOString(),
+      updatedAtMs: stat.mtimeMs,
+      thumbnailUrl: `/api/save-file/${seatId}/${encodeURIComponent(fileName)}`,
+    });
+  }
+
+  entries.sort((a, b) => {
+    if (b.updatedAtMs !== a.updatedAtMs) return b.updatedAtMs - a.updatedAtMs;
+    if (b.session !== a.session) return b.session - a.session;
+    return b.counter - a.counter;
+  });
+
+  return entries;
+}
+
+function emitSaveGalleryLiveEvent(reason, detail = {}) {
+  saveGalleryRevision = Date.now();
+  const payload = JSON.stringify({
+    revision: saveGalleryRevision,
+    reason: String(reason || 'update'),
+    at: new Date().toISOString(),
+    detail,
+  });
+
+  for (const client of saveGalleryLiveClients) {
+    try {
+      client.write(`event: save-gallery-updated\n`);
+      client.write(`data: ${payload}\n\n`);
+    } catch {}
+  }
+}
+
+function scheduleSaveGalleryLiveEvent(reason, detail = {}) {
+  if (saveGalleryNotifyTimer) clearTimeout(saveGalleryNotifyTimer);
+  saveGalleryNotifyTimer = setTimeout(() => {
+    saveGalleryNotifyTimer = null;
+    emitSaveGalleryLiveEvent(reason, detail);
+  }, 120);
+}
+
+function watchSaveGalleryDirectory(dirPath, reason) {
+  try {
+    const watcher = fs.watch(dirPath, { persistent: true }, (eventType, fileName) => {
+      scheduleSaveGalleryLiveEvent(reason, {
+        eventType: String(eventType || ''),
+        fileName: fileName ? String(fileName) : '',
+      });
+    });
+
+    watcher.on('error', (error) => {
+      console.error('[SaveGalleryLive] watcher error', dirPath, error && error.message ? error.message : error);
+    });
+
+    saveGalleryWatchers.push(watcher);
+  } catch (error) {
+    console.error('[SaveGalleryLive] watcher setup failed', dirPath, error && error.message ? error.message : error);
+  }
+}
+
+function setupSaveGalleryWatchers() {
+  watchSaveGalleryDirectory(savesDir, 'saves-root');
+  for (let i = 1; i <= 10; i += 1) {
+    const seatDir = path.join(savesDir, `ID${String(i).padStart(2, '0')}`);
+    watchSaveGalleryDirectory(seatDir, `seat-${String(i).padStart(2, '0')}`);
+  }
+}
+
+function resolvePublicAssetUrl(publicUrl) {
+  const input = String(publicUrl || '').trim();
+  if (!input) return '';
+
+  let pathname = input;
+  try {
+    pathname = new URL(input, 'http://localhost').pathname || input;
+  } catch {}
+
+  const cleanPath = pathname.split('?')[0].split('#')[0];
+  const relativePath = decodeURIComponent(cleanPath.replace(/^\/+/, ''));
+  const filePath = path.join(__dirname, 'public', relativePath);
+
+  try {
+    const stat = fs.statSync(filePath);
+    return `${cleanPath}?v=${Math.floor(stat.mtimeMs)}`;
+  } catch {
+    return cleanPath;
+  }
 }
 
 function clientSettingsPathBySeat(seatId) {
@@ -262,6 +577,7 @@ app.get('/api/update/:channel/latest', (req, res) => {
       sha256: data.sha256 || '',
       notes: data.notes || '',
       publishedAt: data.publishedAt || null,
+      downloadUrl: data.downloadUrl || '',
       downloadPath: `/api/update/${channel}/file/${encodeURIComponent(data.fileName)}`,
     });
   } catch (e) {
@@ -286,6 +602,13 @@ app.get('/api/update/:channel/file/:fileName', (req, res) => {
 
     const filePath = path.join(store.filesDir, safeName);
     if (!fs.existsSync(filePath)) {
+      try {
+        const latest = JSON.parse(fs.readFileSync(store.latestPath, 'utf-8'));
+        const downloadUrl = String(latest && latest.downloadUrl ? latest.downloadUrl : '').trim();
+        if (downloadUrl) {
+          return res.redirect(downloadUrl);
+        }
+      } catch {}
       return res.status(404).json({ ok: false, error: 'file not found' });
     }
 
@@ -336,10 +659,106 @@ app.post('/api/save-snapshot', express.json({ limit: '20mb' }), (req, res) => {
     const seatDir = path.join(savesDir, `ID${id}`);
     if (!fs.existsSync(seatDir)) fs.mkdirSync(seatDir);
     fs.writeFileSync(path.join(seatDir, filename), Buffer.from(base64, 'base64'));
+    scheduleSaveGalleryLiveEvent('save-snapshot', { seatId: id, fileName: filename });
     console.log(`[Save] ${filename}`);
     res.json({ ok: true, filename });
   } catch (e) {
     console.error('[Save Error]', e);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+app.get('/api/save-gallery', (req, res) => {
+  try {
+    const seatIds = parseSeatIdsQuery(req.query.ids);
+    const maxPerSeatRaw = parseInt(String(req.query.maxPerSeat || '120'), 10);
+    const maxPerSeat = Number.isInteger(maxPerSeatRaw)
+      ? Math.max(1, Math.min(500, maxPerSeatRaw))
+      : 120;
+
+    const bySeat = {};
+    let total = 0;
+    for (const seatId of seatIds) {
+      const allEntries = readSeatSaveEntries(seatId);
+      const entries = allEntries.slice(0, maxPerSeat);
+      bySeat[String(seatId)] = {
+        seatId,
+        totalCount: allEntries.length,
+        items: entries,
+      };
+      total += entries.length;
+    }
+
+    res.json({
+      ok: true,
+      seatIds,
+      maxPerSeat,
+      total,
+      bySeat,
+    });
+  } catch (e) {
+    console.error('[SaveGallery] list error', e);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+app.get('/api/save-gallery/live', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  if (typeof res.flushHeaders === 'function') res.flushHeaders();
+
+  const sendReady = () => {
+    const payload = JSON.stringify({
+      revision: saveGalleryRevision,
+      at: new Date().toISOString(),
+      reason: 'ready',
+    });
+    res.write(`event: save-gallery-ready\n`);
+    res.write(`data: ${payload}\n\n`);
+  };
+
+  saveGalleryLiveClients.add(res);
+  sendReady();
+
+  const keepAlive = setInterval(() => {
+    try {
+      res.write(': keep-alive\n\n');
+    } catch {}
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(keepAlive);
+    saveGalleryLiveClients.delete(res);
+  });
+});
+
+app.get('/api/save-file/:seatId/:fileName', (req, res) => {
+  try {
+    const seatId = normalizeSeatIdForSave(req.params.seatId);
+    if (!seatId) return res.status(400).json({ ok: false, error: 'invalid seatId' });
+
+    const rawFileName = String(req.params.fileName || '');
+    const safeFileName = path.basename(rawFileName);
+    if (!safeFileName || safeFileName !== rawFileName) {
+      return res.status(400).json({ ok: false, error: 'invalid fileName' });
+    }
+
+    const seatLabel = String(seatId).padStart(2, '0');
+    const fileNamePattern = new RegExp(`^ID${seatLabel}_[0-9]{2}_[0-9]{3}_[^.]+\\.png$`, 'i');
+    if (!fileNamePattern.test(safeFileName)) {
+      return res.status(400).json({ ok: false, error: 'invalid save file name' });
+    }
+
+    const filePath = path.join(savesDir, `ID${seatLabel}`, safeFileName);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ ok: false, error: 'file not found' });
+    }
+
+    res.sendFile(filePath);
+  } catch (e) {
+    console.error('[SaveGallery] file error', e);
     res.status(500).json({ ok: false, error: e.message });
   }
 });
@@ -431,7 +850,7 @@ app.get('/api/choice-images', (req, res) => {
     const files = fs.readdirSync(dir)
       .filter(f => SUPPORTED_EXT.includes(path.extname(f).toLowerCase()))
       .sort();
-    res.json(files.map(f => `/choice/${f}`));
+    res.json(files.map(f => resolvePublicAssetUrl(`/choice/${encodeURIComponent(f)}`)));
   } catch { res.json([]); }
 });
 
@@ -486,6 +905,9 @@ io.on('connection', (socket) => {
     // ラベル設定を配信（子機の書き画面にも表示）
     socket.emit('label-config', state.labelConfig);
     socket.emit('seat-label-name', { name: state.seatNames[seatId] || '' });
+    socket.emit('judge-color-mode', { enabled: state.judgeColorMode });
+    socket.emit('judge-fill-layer-mode', { mode: state.judgeFillLayerMode });
+    socket.emit('lock-darkness', { value: state.lockDarkness });
 
     // 子機セカンドに背景を即時通知
     const bgUrl = state.clients.get(seatId).bgImageUrl;
@@ -551,6 +973,9 @@ io.on('connection', (socket) => {
     // ラベル設定と名前を送信
     socket.emit('label-config', state.labelConfig);
     socket.emit('seat-label-name', { name: state.seatNames[seatId] || '' });
+    socket.emit('judge-color-mode', { enabled: state.judgeColorMode });
+    socket.emit('judge-fill-layer-mode', { mode: state.judgeFillLayerMode });
+    socket.emit('lock-darkness', { value: state.lockDarkness });
     // 選択肢画像を復元
     if (state.currentChoiceUrl) socket.emit('show-choice', { imageUrl: state.currentChoiceUrl });
   });
@@ -593,6 +1018,7 @@ io.on('connection', (socket) => {
     trackHostAction(socket, 'display-layout', { group: group || 'default' });
     const groupId = (typeof group === 'string' && group.trim()) ? group.trim().slice(0, 32) : 'default';
     state.displayLayouts[groupId] = layout;
+    persistHostSettings();
     const targets = state.hostDisplayGroups.get(groupId);
     if (targets) for (const socketId of targets) io.to(socketId).emit('display-layout', layout);
   });
@@ -606,6 +1032,7 @@ io.on('connection', (socket) => {
     for (const key of allowed) {
       if (config[key] !== undefined) state.labelConfig[key] = config[key];
     }
+    persistHostSettings();
     // client-displayへ
     for (const socketId of state.clientDisplays.values()) {
       io.to(socketId).emit('label-config', state.labelConfig);
@@ -883,8 +1310,10 @@ io.on('connection', (socket) => {
   // 正誤判定（書き画面：色フラッシュ、セカンド：画像オーバーレイ）
   socket.on('host-judge', ({ seatId, kind, imageUrl }) => {
     trackHostAction(socket, 'host-judge', { seatId, kind: kind || 'correct' });
-    const resolvedUrl = imageUrl ||
-      (kind === 'correct' ? '/overlays/correct/aka_fill.png' : '/overlays/incorrect/ao_fill.png');
+    const fallbackUrl = kind === 'correct'
+      ? '/overlays/correct/aka_fill.png'
+      : '/overlays/incorrect/ao_fill.png';
+    const resolvedUrl = resolvePublicAssetUrl(imageUrl || fallbackUrl);
     const client = state.clients.get(String(seatId));
     if (client?.socketId) io.to(client.socketId).emit('show-overlay', { imageUrl: resolvedUrl });
     const displaySocketId = state.clientDisplays.get(String(seatId));
@@ -897,7 +1326,16 @@ io.on('connection', (socket) => {
   socket.on('host-set-judge-color-mode', ({ enabled }) => {
     trackHostAction(socket, 'host-set-judge-color-mode', { enabled: !!enabled });
     state.judgeColorMode = !!enabled;
+    persistHostSettings();
     io.emit('judge-color-mode', { enabled: state.judgeColorMode });
+  });
+
+  socket.on('host-set-judge-fill-layer-mode', ({ mode }) => {
+    const nextMode = normalizeJudgeFillLayerMode(mode);
+    trackHostAction(socket, 'host-set-judge-fill-layer-mode', { mode: nextMode });
+    state.judgeFillLayerMode = nextMode;
+    persistHostSettings();
+    io.emit('judge-fill-layer-mode', { mode: state.judgeFillLayerMode });
   });
 
   // ロック暗転の濃さ
@@ -906,21 +1344,23 @@ io.on('connection', (socket) => {
     if (isNaN(v) || v < 0 || v > 100) return;
     trackHostAction(socket, 'host-set-lock-darkness', { value: v });
     state.lockDarkness = v;
+    persistHostSettings();
     io.emit('lock-darkness', { value: state.lockDarkness });
   });
 
   // 選択肢画像表示
   socket.on('host-show-choice', ({ imageUrl }) => {
     trackHostAction(socket, 'host-show-choice', { hasImage: !!imageUrl });
-    state.currentChoiceUrl = imageUrl || null;
+    const resolvedUrl = resolvePublicAssetUrl(imageUrl);
+    state.currentChoiceUrl = resolvedUrl || null;
     for (const [, client] of state.clients) {
-      if (client.socketId) io.to(client.socketId).emit('show-choice', { imageUrl });
+      if (client.socketId) io.to(client.socketId).emit('show-choice', { imageUrl: resolvedUrl });
     }
     for (const socketId of state.clientDisplays.values()) {
-      io.to(socketId).emit('show-choice', { imageUrl });
+      io.to(socketId).emit('show-choice', { imageUrl: resolvedUrl });
     }
-    for (const id of state.hosts)                io.to(id).emit('show-choice', { imageUrl });
-    for (const id of allHostDisplayIds()) io.to(id).emit('show-choice', { imageUrl });
+    for (const id of state.hosts)                io.to(id).emit('show-choice', { imageUrl: resolvedUrl });
+    for (const id of allHostDisplayIds()) io.to(id).emit('show-choice', { imageUrl: resolvedUrl });
   });
 
   // 選択肢画像消去
@@ -1104,6 +1544,7 @@ function buildFullState() {
     labelConfig: state.labelConfig,
     choiceImageUrl: state.currentChoiceUrl || null,
     judgeColorMode: state.judgeColorMode,
+    judgeFillLayerMode: state.judgeFillLayerMode,
     lockDarkness: state.lockDarkness,
   };
 }
@@ -1141,5 +1582,11 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`  親機のセカンド: http://${ip}:${PORT}/host-display`);
   console.log(`  子機:           http://${ip}:${PORT}/client`);
   console.log(`  子機のセカンド: http://${ip}:${PORT}/client-display`);
+  const activeSaveViewerPath = resolveActiveSaveViewerHtmlPath();
+  if (activeSaveViewerPath) {
+    console.log(`  save-viewer HTML: ${activeSaveViewerPath}`);
+  } else {
+    console.log('  save-viewer HTML: (not found)');
+  }
   console.log('==================================================');
 });

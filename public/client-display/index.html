@@ -5,7 +5,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KakiMoni - 子機セカンド（大型モニター）</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -71,7 +71,7 @@
   /* ロゴなしのときのフォールバックテキスト */
   #cover-label {
     font-size: 3rem; color: rgba(96,165,250,0.4); font-weight: bold;
-    letter-spacing: 0.15em; user-select: none;
+    letter-spacing: 0.15em; -webkit-user-select: none; user-select: none;
   }
   #cover-label.hidden { display: none; }
 
@@ -180,7 +180,7 @@
 
   /* 選択肢レイヤー */
   #choice-layer {
-    position: absolute; inset: 0;
+    position: absolute; inset: 0; z-index: 31;
     display: none;
     pointer-events: none;
   }
@@ -301,8 +301,44 @@ let liveStroke = null; // 描画中ストローク
 let bgImageUrl = '';
 let fillImageUrl = '';
 let judgeColorMode = false;
+const JUDGE_FILL_LAYER_KEY = 'judgeFillLayerMode';
+
+function normalizeJudgeFillLayerMode(value) {
+  return value === 'under' ? 'under' : 'over';
+}
+
+function resolveJudgeFillLayerMode() {
+  const params = new URLSearchParams(location.search);
+  const qp = (params.get('judgeFillLayer') || '').trim().toLowerCase();
+  if (qp === 'under' || qp === 'over') {
+    localStorage.setItem(JUDGE_FILL_LAYER_KEY, qp);
+    return qp;
+  }
+  return normalizeJudgeFillLayerMode(localStorage.getItem(JUDGE_FILL_LAYER_KEY));
+}
+
+let judgeFillLayerMode = resolveJudgeFillLayerMode();
+
+function applyJudgeFillLayerMode(mode, options = {}) {
+  const { persist = true } = options;
+  judgeFillLayerMode = normalizeJudgeFillLayerMode(mode);
+  if (persist) localStorage.setItem(JUDGE_FILL_LAYER_KEY, judgeFillLayerMode);
+  updateCanvasWrapBg();
+}
+let showJudgeOverlay = true;
 let labelConfig = null;
 let labelName   = '';
+
+async function loadSeatSettings() {
+  const sid = parseInt(String(seatId || document.getElementById('input-seat').value || ''), 10);
+  if (!sid) return;
+  try {
+    const r = await fetch(`${location.origin}/api/client-settings/${sid}`);
+    const data = await r.json();
+    if (!r.ok || !data?.ok || !data.settings) return;
+    showJudgeOverlay = data.settings.showJudgeOverlay !== false;
+  } catch {}
+}
 
 function applyLabelDisplay() {
   const el = document.getElementById('seat-label');
@@ -345,7 +381,7 @@ document.getElementById('btn-start').addEventListener('click', () => {
   setupModal.style.display = 'none';
   main.style.display = 'block';
   initCanvas();
-  connectSocket();
+  loadSeatSettings().finally(() => connectSocket());
 });
 
 // URLパラメータに ?seat=N があれば自動スタート
@@ -403,8 +439,13 @@ function resizeCanvas() {
 
 function updateCanvasWrapBg() {
   if (fillImageUrl && bgImageUrl) {
-    wrap.style.backgroundImage = `url('${bgImageUrl}'), url('${fillImageUrl}')`;
-    wrap.style.backgroundSize = 'cover, 100% 100%';
+    if (judgeFillLayerMode === 'over') {
+      wrap.style.backgroundImage = `url('${fillImageUrl}'), url('${bgImageUrl}')`;
+      wrap.style.backgroundSize = '100% 100%, cover';
+    } else {
+      wrap.style.backgroundImage = `url('${bgImageUrl}'), url('${fillImageUrl}')`;
+      wrap.style.backgroundSize = 'cover, 100% 100%';
+    }
   } else if (fillImageUrl) {
     wrap.style.backgroundImage = `url('${fillImageUrl}')`;
     wrap.style.backgroundSize = '100% 100%';
@@ -704,6 +745,7 @@ function connectSocket() {
 
   // 正解・不正解オーバーレイ
   socket.on('show-overlay', ({ imageUrl }) => {
+    if (!showJudgeOverlay) return;
     if (imageUrl) { showOverlay(imageUrl); redrawAll(); }
   });
   socket.on('clear-overlay', () => {
@@ -712,6 +754,9 @@ function connectSocket() {
   socket.on('judge-color-mode', ({ enabled }) => {
     judgeColorMode = enabled;
     redrawAll();
+  });
+  socket.on('judge-fill-layer-mode', ({ mode }) => {
+    applyJudgeFillLayerMode(mode, { persist: true });
   });
 
   // 選択肢画像
@@ -732,6 +777,9 @@ function connectSocket() {
 
   // 状態同期（初回接続時）
   socket.on('full-state', (state) => {
+    if (typeof state.judgeFillLayerMode !== 'undefined') {
+      applyJudgeFillLayerMode(state.judgeFillLayerMode, { persist: true });
+    }
     const seat = state.seats.find(s => String(s.seatId) === String(seatId));
     if (seat) {
       setBgImage(seat.bgImageUrl || '');
