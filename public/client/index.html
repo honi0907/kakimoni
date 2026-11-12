@@ -787,6 +787,8 @@ let penSize    = 8;
 let judgeColorMode = false;
 let judging        = false;
 let isDrawing  = false;
+let activePointerId = null;
+let ignoreTouchUntil = 0;
 let lockDarkness = 65;
 let currentStroke = null; // 現在のストローク {color, size, tool, points:[]}
 let clientLabelConfig = null;
@@ -914,12 +916,50 @@ function getXY(e) {
   return { x: e.clientX - rect.left, y: e.clientY - rect.top };
 }
 
-function onPointerDown(e) {
-  if (isLocked) return;
+function strokeJumpLimit(stroke) {
+  const w = Number(stroke && stroke.srcW) || 1920;
+  const h = Number(stroke && stroke.srcH) || 1080;
+  return Math.hypot(w, h) * 0.5;
+}
+
+function emitStrokeStart(stroke) {
+  if (!socket || !socket.connected || !stroke) return;
+  socket.emit('stroke-start', {
+    tool: stroke.tool,
+    color: stroke.color,
+    size: stroke.size,
+    srcW: stroke.srcW,
+    srcH: stroke.srcH,
+    points: stroke.points.map((p) => ({ x: p.x, y: p.y })),
+  });
+}
+
+function endActiveStroke() {
+  if (!isDrawing || !currentStroke) {
+    isDrawing = false;
+    activePointerId = null;
+    return;
+  }
+  isDrawing = false;
+  activePointerId = null;
+  undoStack.push([...strokeHistory]);
+  strokeHistory.push(currentStroke);
+  if (socket && socket.connected) socket.emit('stroke-end');
+  const wasEraser = currentStroke.tool === 'eraser';
+  currentStroke = null;
+  if (wasEraser) {
+    clearTimeout(eraserAutoRevertTimer);
+    startEraserRing();
+    eraserAutoRevertTimer = setTimeout(revertToPen, 1500);
+  }
+}
+
+function startStrokeAt(e, pt) {
   e.preventDefault();
-  canvas.setPointerCapture(e.pointerId);
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
   isDrawing = true;
-  const pt = getXY(e);
+  activePointerId = e.pointerId;
+  if (e.pointerType === 'pen') ignoreTouchUntil = Date.now() + 800;
   const cw = canvas.width  / (window.devicePixelRatio || 1);
   const ch = canvas.height / (window.devicePixelRatio || 1);
   currentStroke = {
@@ -931,15 +971,29 @@ function onPointerDown(e) {
     srcH:   ch,
   };
   drawStroke(currentStroke);
-  if (socket && socket.connected) {
-    socket.emit('stroke-start', currentStroke);
-  }
+  emitStrokeStart(currentStroke);
+}
+
+function onPointerDown(e) {
+  if (isLocked) return;
+  if (e.pointerType === 'touch' && Date.now() < ignoreTouchUntil) return;
+  if (isDrawing && e.pointerId !== activePointerId) return;
+  if (isDrawing) return;
+  startStrokeAt(e, getXY(e));
 }
 
 function onPointerMove(e) {
-  if (!isDrawing || !currentStroke) return;
+  if (isLocked || !isDrawing || !currentStroke) return;
+  if (e.pointerId !== activePointerId) return;
   e.preventDefault();
   const pt = getXY(e);
+  const prev = currentStroke.points[currentStroke.points.length - 1];
+  if (prev && Math.hypot(pt.x - prev.x, pt.y - prev.y) > strokeJumpLimit(currentStroke)) {
+    endActiveStroke();
+    if (isLocked) return;
+    startStrokeAt(e, pt);
+    return;
+  }
   currentStroke.points.push(pt);
   // 差分のみ描画（最後の2点）
   const pts = currentStroke.points;
@@ -975,20 +1029,9 @@ function onPointerMove(e) {
 }
 
 function onPointerUp(e) {
-  if (!isDrawing || !currentStroke) return;
-  isDrawing = false;
-  undoStack.push([...strokeHistory]);
-  strokeHistory.push(currentStroke);
-  if (socket && socket.connected) {
-    socket.emit('stroke-end');
-  }
-  currentStroke = null;
-  // 消しゴム使用後3秒でペンに自動復帰
-  if (activeTool === 'eraser') {
-    clearTimeout(eraserAutoRevertTimer);
-    startEraserRing();
-    eraserAutoRevertTimer = setTimeout(revertToPen, 1500);
-  }
+  if (e.pointerId !== activePointerId) return;
+  if (e.pointerType === 'pen') ignoreTouchUntil = Date.now() + 800;
+  endActiveStroke();
 }
 
 // ====================================================
@@ -1034,6 +1077,7 @@ btnConfirm.addEventListener('click', () => {
   if (isLocked || isConfirmed) return;
   isConfirmed = true;
   isLocked = true;
+  endActiveStroke();
   btnConfirm.disabled = true;
   // ロックオーバーレイをカスタムメッセージで表示
   document.getElementById('lock-icon').textContent = '';
@@ -1403,6 +1447,7 @@ function connectSocket() {
   // ロック
   socket.on('lock', () => {
     isLocked = true;
+    endActiveStroke();
     // 親機からのロック（自己確定でない場合）のみアイコン・メッセージを上書き
     if (!isConfirmed) {
       document.getElementById('lock-icon').textContent = '';

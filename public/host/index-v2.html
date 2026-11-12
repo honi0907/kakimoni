@@ -1570,17 +1570,31 @@ function connect() {
 
   // リアルタイム描画（指を魚いたタイミング）
   socket.on('stroke-start', ({ seatId, stroke }) => {
-    currentStrokes.set(String(seatId), stroke);
-    const seat = seats.get(String(seatId));
+    const id = String(seatId);
+    const copy = cloneStroke(stroke);
+    if (!copy) return;
+    currentStrokes.set(id, copy);
+    const seat = seats.get(id);
     if (!seat) return;
-    drawStrokeOnCanvas(seat.canvas, seat.ctx, stroke, judgeColorMode && seat.judging);
+    drawStrokeOnCanvas(seat.canvas, seat.ctx, copy, judgeColorMode && seat.judging);
   });
 
   socket.on('stroke-point', ({ seatId, point }) => {
     const id = String(seatId);
     const stroke = currentStrokes.get(id);
     if (!stroke) return;
-    stroke.points.push(point);
+    const x = Number(point && point.x);
+    const y = Number(point && point.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    const safePoint = { x, y };
+    if (isStrokeJump(stroke, safePoint)) {
+      const seat = seats.get(id);
+      if (seat) seat.strokes.push(cloneStroke(stroke));
+      stroke.points = [safePoint];
+      if (seat) redrawCanvas(seat);
+      return;
+    }
+    stroke.points.push(safePoint);
     const seat = seats.get(id);
     if (!seat) return;
     drawStrokeSegment(seat.canvas, seat.ctx, stroke, judgeColorMode && seat.judging);
@@ -1591,7 +1605,7 @@ function connect() {
     const stroke = currentStrokes.get(id);
     if (!stroke) return;
     const seat = seats.get(id);
-    if (seat) seat.strokes.push(stroke);
+    if (seat) seat.strokes.push(cloneStroke(stroke));
     currentStrokes.delete(id);
   });
 
@@ -1614,7 +1628,7 @@ function connect() {
   socket.on('seat-strokes-updated', ({ seatId, strokes }) => {
     const seat = seats.get(String(seatId));
     if (!seat) return;
-    seat.strokes = strokes;
+    seat.strokes = (strokes || []).map(cloneStroke).filter(Boolean);
     redrawCanvas(seat);
   });
 
@@ -1738,7 +1752,7 @@ function updateSeat(seatData) {
 
   // ストローク初期化
   if (seatData.strokes && seatData.strokes.length > 0) {
-    seat.strokes = [...seatData.strokes];
+    seat.strokes = seatData.strokes.map(cloneStroke).filter(Boolean);
     redrawCanvas(seat);
   }
 
@@ -2010,6 +2024,39 @@ function invertColor(hex) {
   return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
 }
 
+function cloneStroke(stroke) {
+  if (!stroke || typeof stroke !== 'object') return null;
+  const points = Array.isArray(stroke.points)
+    ? stroke.points.map((p) => ({ x: Number(p && p.x) || 0, y: Number(p && p.y) || 0 }))
+    : [];
+  return {
+    tool: stroke.tool,
+    color: stroke.color,
+    size: stroke.size,
+    srcW: stroke.srcW,
+    srcH: stroke.srcH,
+    points,
+  };
+}
+
+function strokeJumpLimit(stroke) {
+  const w = Number(stroke && stroke.srcW) || 1920;
+  const h = Number(stroke && stroke.srcH) || 1080;
+  return Math.hypot(w, h) * 0.5;
+}
+
+function isStrokeJump(stroke, point) {
+  const pts = stroke && stroke.points;
+  if (!pts || pts.length === 0 || !point) return false;
+  const prev = pts[pts.length - 1];
+  return Math.hypot(point.x - prev.x, point.y - prev.y) > strokeJumpLimit(stroke);
+}
+
+function pointsJump(stroke, prev, curr) {
+  if (!prev || !curr) return false;
+  return Math.hypot(curr.x - prev.x, curr.y - prev.y) > strokeJumpLimit(stroke);
+}
+
 function drawStrokeSegment(canvas, ctx, stroke, inv = false) {
   const pts = stroke.points;
   if (pts.length < 2) return;
@@ -2069,6 +2116,12 @@ function drawStrokeOnCanvas(canvas, ctx, stroke, inv = false) {
   for (let i = 1; i < stroke.points.length; i++) {
     const prev = stroke.points[i - 1];
     const curr = stroke.points[i];
+    if (pointsJump(stroke, prev, curr)) {
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(curr.x * scaleX, curr.y * scaleY);
+      continue;
+    }
     ctx.quadraticCurveTo(
       prev.x * scaleX, prev.y * scaleY,
       (prev.x + curr.x) / 2 * scaleX, (prev.y + curr.y) / 2 * scaleY
@@ -2326,6 +2379,12 @@ async function captureAndSave(seatId, type, session, counter, judgeImageUrl = nu
     for (let i = 1; i < stroke.points.length; i++) {
       const prev = stroke.points[i - 1];
       const curr = stroke.points[i];
+      if (pointsJump(stroke, prev, curr)) {
+        octx.stroke();
+        octx.beginPath();
+        octx.moveTo(curr.x * scaleX, curr.y * scaleY);
+        continue;
+      }
       octx.quadraticCurveTo(
         prev.x * scaleX, prev.y * scaleY,
         (prev.x + curr.x) / 2 * scaleX, (prev.y + curr.y) / 2 * scaleY

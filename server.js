@@ -623,15 +623,63 @@ io.on('connection', (socket) => {
   // ---------- 描画 ----------
 
   // ストロークデータ受信（リアルタイム分割方式）
+  // 配信・保存する配列は毎回コピーする。受信後に points へ push しても、
+  // 既に送った stroke-start や確定済みの画に点が混ざらないようにする。
+  function snapshotStroke(stroke) {
+    if (!stroke || typeof stroke !== 'object') return null;
+    const points = Array.isArray(stroke.points)
+      ? stroke.points.map((p) => ({ x: Number(p && p.x) || 0, y: Number(p && p.y) || 0 }))
+      : [];
+    return {
+      tool: stroke.tool,
+      color: stroke.color,
+      size: stroke.size,
+      srcW: stroke.srcW,
+      srcH: stroke.srcH,
+      points,
+    };
+  }
+
+  function strokeJumpLimit(stroke) {
+    const w = Number(stroke && stroke.srcW) || 1920;
+    const h = Number(stroke && stroke.srcH) || 1080;
+    return Math.hypot(w, h) * 0.5;
+  }
+
+  function isStrokeJump(stroke, point) {
+    const pts = stroke && stroke.points;
+    if (!pts || pts.length === 0) return false;
+    const prev = pts[pts.length - 1];
+    const x = Number(point && point.x);
+    const y = Number(point && point.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return true;
+    return Math.hypot(x - prev.x, y - prev.y) > strokeJumpLimit(stroke);
+  }
+
+  function commitOpenStroke(client, seatId) {
+    if (!client.currentStroke || !client.currentStroke.points || client.currentStroke.points.length === 0) {
+      client.currentStroke = null;
+      return;
+    }
+    client.strokes.push(snapshotStroke(client.currentStroke));
+    broadcastToHosts('stroke-end', { seatId });
+    const displaySocketId = state.clientDisplays.get(seatId);
+    if (displaySocketId) io.to(displaySocketId).emit('stroke-end');
+    client.currentStroke = null;
+  }
+
   socket.on('stroke-start', (strokeData) => {
     const seatId = socket.seatId;
     if (!seatId) return;
     const client = state.clients.get(seatId);
     if (!client || client.locked) return;
-    client.currentStroke = strokeData;
-    broadcastToHosts('stroke-start', { seatId, stroke: strokeData });
+    if (client.currentStroke) commitOpenStroke(client, seatId);
+    const snapshot = snapshotStroke(strokeData);
+    if (!snapshot) return;
+    client.currentStroke = snapshot;
+    broadcastToHosts('stroke-start', { seatId, stroke: snapshotStroke(snapshot) });
     const displaySocketId = state.clientDisplays.get(seatId);
-    if (displaySocketId) io.to(displaySocketId).emit('stroke-start', strokeData);
+    if (displaySocketId) io.to(displaySocketId).emit('stroke-start', snapshotStroke(snapshot));
   });
 
   socket.on('stroke-point', ({ point }) => {
@@ -639,10 +687,26 @@ io.on('connection', (socket) => {
     if (!seatId) return;
     const client = state.clients.get(seatId);
     if (!client || client.locked || !client.currentStroke) return;
-    client.currentStroke.points.push(point);
-    broadcastToHosts('stroke-point', { seatId, point });
+    const x = Number(point && point.x);
+    const y = Number(point && point.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    const safePoint = { x, y };
+    // 画面を横切るような一点だけは、前の画とつながない
+    if (isStrokeJump(client.currentStroke, safePoint)) {
+      const next = snapshotStroke(client.currentStroke);
+      commitOpenStroke(client, seatId);
+      if (!next || client.locked) return;
+      next.points = [safePoint];
+      client.currentStroke = next;
+      broadcastToHosts('stroke-start', { seatId, stroke: snapshotStroke(next) });
+      const displaySocketId = state.clientDisplays.get(seatId);
+      if (displaySocketId) io.to(displaySocketId).emit('stroke-start', snapshotStroke(next));
+      return;
+    }
+    client.currentStroke.points.push(safePoint);
+    broadcastToHosts('stroke-point', { seatId, point: safePoint });
     const displaySocketId = state.clientDisplays.get(seatId);
-    if (displaySocketId) io.to(displaySocketId).emit('stroke-point', point);
+    if (displaySocketId) io.to(displaySocketId).emit('stroke-point', safePoint);
   });
 
   socket.on('stroke-end', () => {
@@ -650,11 +714,7 @@ io.on('connection', (socket) => {
     if (!seatId) return;
     const client = state.clients.get(seatId);
     if (!client || !client.currentStroke) return;
-    client.strokes.push(client.currentStroke);
-    broadcastToHosts('stroke-end', { seatId });
-    const displaySocketId = state.clientDisplays.get(seatId);
-    if (displaySocketId) io.to(displaySocketId).emit('stroke-end');
-    client.currentStroke = null;
+    commitOpenStroke(client, seatId);
   });
 
   // 子機側「決定」ボタン → 自席をロック
@@ -663,6 +723,7 @@ io.on('connection', (socket) => {
     if (!seatId) return;
     const client = state.clients.get(seatId);
     if (!client || client.locked) return;
+    commitOpenStroke(client, seatId);
     client.locked = true;
     // 子機自身には lock イベントを送らない（自前でロック表示済み）
     // 親機・親機セカンドへ通知（確定フラグ付き）
@@ -711,6 +772,7 @@ io.on('connection', (socket) => {
     trackHostAction(socket, 'host-lock', { seatId });
     const client = state.clients.get(seatId);
     if (client) {
+      commitOpenStroke(client, seatId);
       client.locked = true;
       const clientSocketId = client.socketId;
       if (clientSocketId) io.to(clientSocketId).emit('lock');
@@ -734,6 +796,7 @@ io.on('connection', (socket) => {
   socket.on('host-lock-all', () => {
     trackHostAction(socket, 'host-lock-all');
     for (const [seatId, client] of state.clients) {
+      commitOpenStroke(client, seatId);
       client.locked = true;
       if (client.socketId) io.to(client.socketId).emit('lock');
     }
@@ -927,6 +990,7 @@ io.on('connection', (socket) => {
         io.emit('timer-end', {});
         // タイムアップ時に全席自動ロック
         for (const [seatId, client] of state.clients) {
+          commitOpenStroke(client, seatId);
           client.locked = true;
           if (client.socketId) io.to(client.socketId).emit('lock');
         }
