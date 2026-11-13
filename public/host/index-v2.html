@@ -2522,6 +2522,16 @@ async function captureAndSave(seatId, type, session, counter, judgeImageUrl = nu
   // BG画像
   if (seat.bgImageUrl) await loadImageToCanvas(octx, seat.bgImageUrl, 0, 0, W, H);
 
+  // 親機コンパネの線は使わない。レイアウトと同じサーバー上の線だけを描く。
+  let saveStrokes = seat.strokes || [];
+  try {
+    const strokeRes = await fetch('/api/client-strokes/' + encodeURIComponent(seatId));
+    const strokeData = await strokeRes.json();
+    if (strokeData && Array.isArray(strokeData.strokes)) saveStrokes = strokeData.strokes;
+  } catch (e) {
+    console.error('[Save strokes]', e);
+  }
+
   // fill を BG の上に出すモード
   if (type === 'JUDGE' && isFillJudge && judgeFillLayerMode === 'over') {
     await loadImageToCanvas(octx, judgeImageUrl, 0, 0, W, H);
@@ -2529,7 +2539,7 @@ async function captureAndSave(seatId, type, session, counter, judgeImageUrl = nu
 
   // 描画ストロークをフル解像度で直接再描画（seat.canvasの低解像度upscaleを避ける）
   const saveInv = type !== 'GO' && judgeColorMode && seat.judging;
-  for (const stroke of (seat.strokes || [])) {
+  for (const stroke of saveStrokes) {
     if (!stroke.points || stroke.points.length < 1) continue;
     const scaleX = stroke.srcW ? W / stroke.srcW : 1;
     const scaleY = stroke.srcH ? H / stroke.srcH : 1;

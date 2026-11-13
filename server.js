@@ -843,6 +843,47 @@ app.get('/api/overlays', (req, res) => {
   res.json({ correct: load('correct'), incorrect: load('incorrect') });
 });
 
+function copyStrokeForSave(stroke) {
+  if (!stroke || typeof stroke !== 'object') return null;
+  const points = Array.isArray(stroke.points)
+    ? stroke.points
+        .map((p) => ({ x: Number(p && p.x), y: Number(p && p.y) }))
+        .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
+    : [];
+  return {
+    tool: stroke.tool,
+    color: stroke.color,
+    size: stroke.size,
+    srcW: stroke.srcW,
+    srcH: stroke.srcH,
+    points,
+  };
+}
+
+function findClientBySeat(raw) {
+  const n = normalizeSeatId(raw);
+  if (!n) return null;
+  const padded = String(n).padStart(2, '0');
+  for (const key of [raw, String(n), padded]) {
+    if (state.clients.has(key)) return state.clients.get(key);
+  }
+  for (const [key, client] of state.clients) {
+    if (normalizeSeatId(key) === n) return client;
+  }
+  return null;
+}
+
+// 保存用。レイアウトと同じ、サーバーが配信している線だけを返す。
+app.get('/api/client-strokes/:seatId', (req, res) => {
+  const client = findClientBySeat(req.params.seatId);
+  const strokes = client ? (client.strokes || []).map(copyStrokeForSave).filter(Boolean) : [];
+  if (client && client.currentStroke && client.currentStroke.points && client.currentStroke.points.length) {
+    const open = copyStrokeForSave(client.currentStroke);
+    if (open) strokes.push(open);
+  }
+  res.json({ ok: true, strokes });
+});
+
 // 選択肢画像一覧 API
 app.get('/api/choice-images', (req, res) => {
   const dir = path.join(__dirname, 'public', 'choice');
