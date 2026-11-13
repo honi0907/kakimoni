@@ -817,7 +817,7 @@
       rowIds.forEach((seatId) => {
         const key = String(seatId);
         const seat = bySeat[key] || { totalCount: 0, items: [] };
-        rowEl.appendChild(renderSeat(seatId, seat, { featuredMode: rowIndex === 0 }));
+        rowEl.appendChild(renderSeat(seatId, seat, { featuredMode: true }));
       });
 
       sectionsEl.appendChild(rowEl);
